@@ -107,6 +107,30 @@ async def test_dependency_audit_no_manifest(tmp_path):
     assert rep.audit == "dependency_audit" and isinstance(rep.findings, list)
 
 
+def test_secret_scan_ignores_placeholders_and_downgrades_test_files(tmp_path):
+    (tmp_path / "config.ts").write_text('pairingToken: "change-me-local-only"\n', encoding="utf-8")
+    tdir = tmp_path / "tests"
+    tdir.mkdir()
+    (tdir / "test_x.py").write_text('KEY = "AKIA1234567890ABCD90"\n', encoding="utf-8")
+    rep = secret_scan(str(tmp_path))
+    assert not any("config.ts" in f.location for f in rep.findings)  # placeholder skipped
+    test_hits = [f for f in rep.findings if "test_x.py" in f.location]
+    assert test_hits and all(f.severity == "low" for f in test_hits)
+    assert rep.ok  # no high-severity findings
+
+
+async def test_audit_tool_reports_success_with_findings(tmp_path):
+    (tmp_path / "leak.py").write_text('T = "ghp_' + "a" * 36 + '"\n', encoding="utf-8")
+    reg = build_security_registry()
+    res = await reg.execute(
+        ToolCall(tool_name="secret_scan", arguments={}),
+        ToolContext(workspace_root=str(tmp_path)),
+    )
+    assert res.success is True                 # the audit ran
+    assert res.metadata["clean"] is False      # ...and found something
+    assert res.metadata["findings"] >= 1
+
+
 # -- scoped active probe --------------------------------------------
 async def test_tcp_scan_refuses_unauthorized():
     res = await tcp_connect_scan(_scope(), "192.168.99.99")

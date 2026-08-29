@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import json
 import re
 import shutil
@@ -33,6 +34,12 @@ _SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 _SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "target", ".vajra"}
 _TEXT_MAX = 2 * 1024 * 1024
 
+# obvious non-secrets - placeholders, docs, test fixtures
+_PLACEHOLDER = re.compile(
+    r"(?i)(change[-_ ]?me|your[-_ ]?|example|placeholder|dummy|redacted|xxxx+|"
+    r"\btest[-_]?(key|token|secret)|<[^>]+>|\.\.\.|s3cr3t|password123|00000000)"
+)
+
 
 @dataclass
 class Finding:
@@ -56,6 +63,28 @@ class AuditReport:
         }
 
 
+def _gitignore_matcher(root: Path):
+    gi = root / ".gitignore"
+    pats = [
+        ln.strip() for ln in (gi.read_text(encoding="utf-8").splitlines() if gi.exists() else [])
+        if ln.strip() and not ln.startswith("#")
+    ]
+
+    def ignored(rel: str) -> bool:
+        rel = rel.replace("\\", "/")
+        base = rel.rsplit("/", 1)[-1]
+        for p in pats:
+            p = p.rstrip("/")
+            neg = p.startswith("!")
+            if neg:
+                continue
+            if fnmatch.fnmatch(base, p) or fnmatch.fnmatch(rel, p) or fnmatch.fnmatch(rel, f"{p}/*"):
+                return True
+        return False
+
+    return ignored
+
+
 def _iter_text_files(root: Path):
     for p in root.rglob("*"):
         if p.is_dir() or any(part in _SKIP_DIRS for part in p.parts):
@@ -71,19 +100,37 @@ def _iter_text_files(root: Path):
 def secret_scan(root: str) -> AuditReport:
     base = Path(root)
     findings: list[Finding] = []
+    is_ignored = _gitignore_matcher(base)
     for path, text in _iter_text_files(base):
         rel = str(path.relative_to(base))
         if path.name in {".env.example", ".env.sample", "servers.json"}:
             continue
+        parts = {p.lower() for p in path.parts}
+        in_test = bool(parts & {"tests", "test", "__tests__", "fixtures"}) or path.name.startswith("test_")
+        gitignored = is_ignored(rel)
         for line_no, line in enumerate(text.splitlines(), 1):
             for name, pat in _SECRET_PATTERNS:
-                if pat.search(line):
-                    findings.append(Finding("high", f"secret:{name}", f"{rel}:{line_no}",
-                                            "possible committed credential"))
+                m = pat.search(line)
+                if not m:
+                    continue
+                matched = m.group(m.lastindex or 0)
+                if _PLACEHOLDER.search(matched) or _PLACEHOLDER.search(line):
                     break
+                if gitignored:
+                    sev, detail = "low", "in a git-ignored file (not committed) - still, rotate if real"
+                elif in_test:
+                    sev, detail = "low", "match in a test file - likely a fixture"
+                else:
+                    sev, detail = "high", "possible committed credential"
+                findings.append(Finding(sev, f"secret:{name}", f"{rel}:{line_no}", detail))
+                break
+    high = [f for f in findings if f.severity == "high"]
     return AuditReport(
-        "secret_scan", ok=not findings, findings=findings,
-        summary=f"{len(findings)} possible secret(s)" if findings else "no secrets detected",
+        "secret_scan", ok=not high, findings=findings,
+        summary=(
+            f"{len(high)} likely secret(s), {len(findings) - len(high)} low-confidence"
+            if findings else "no secrets detected"
+        ),
     )
 
 

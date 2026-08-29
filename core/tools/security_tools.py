@@ -18,6 +18,16 @@ from core.security.scope import ScopeStore
 from core.tools.base import Tool, ToolContext, ToolResult
 
 
+def _audit_result(report) -> ToolResult:
+    """An audit that ran is a successful tool call - findings are data, not a
+    failure. `clean` in metadata carries the pass/fail signal for the agent."""
+    body = json.dumps(report.as_dict(), indent=2)[:40000]
+    return ToolResult(
+        success=True, stdout=body,
+        metadata={"audit": report.audit, "clean": report.ok, "findings": len(report.findings)},
+    )
+
+
 class SecurityScopesTool(Tool):
     name = "security_scopes"
     description = "List the authorized-security scope profiles defined for this project (name, targets, techniques, expiry)."
@@ -47,7 +57,7 @@ class DependencyAuditTool(Tool):
 
     async def run(self, ctx: ToolContext, **_: Any) -> ToolResult:
         report = await auditsvc.dependency_audit(ctx.workspace_root or ".")
-        return ToolResult(success=report.ok, stdout=json.dumps(report.as_dict(), indent=2)[:40000])
+        return _audit_result(report)
 
 
 class SecretScanTool(Tool):
@@ -57,8 +67,7 @@ class SecretScanTool(Tool):
     timeout_seconds = 120
 
     async def run(self, ctx: ToolContext, **_: Any) -> ToolResult:
-        report = auditsvc.secret_scan(ctx.workspace_root or ".")
-        return ToolResult(success=report.ok, stdout=json.dumps(report.as_dict(), indent=2)[:40000])
+        return _audit_result(auditsvc.secret_scan(ctx.workspace_root or "."))
 
 
 class ConfigAuditTool(Tool):
@@ -68,8 +77,7 @@ class ConfigAuditTool(Tool):
     timeout_seconds = 60
 
     async def run(self, ctx: ToolContext, **_: Any) -> ToolResult:
-        report = auditsvc.config_audit(ctx.workspace_root or ".")
-        return ToolResult(success=report.ok, stdout=json.dumps(report.as_dict(), indent=2)[:40000])
+        return _audit_result(auditsvc.config_audit(ctx.workspace_root or "."))
 
 
 def _resolve_scope(ctx: ToolContext, scope: str):

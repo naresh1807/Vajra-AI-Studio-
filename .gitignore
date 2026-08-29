@@ -36,3 +36,6 @@ Thumbs.db
 
 # sandbox (local scratch projects for testing Vajra)
 sandbox/
+
+# built installer
+VajraAI-Setup.exe

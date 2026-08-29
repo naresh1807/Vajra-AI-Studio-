@@ -76,24 +76,25 @@ llama.cpp). Swapping providers needs no agent-code changes.
   event (`logs/task_events.jsonl` + DB); secrets are redacted before persistence.
 - **Bounded autonomy** — 2 same-strategy retries, then re-plan. No infinite loops.
 
-## Status (manual v3.0 roadmap)
+## Status
 
-| Phase | | |
+🟢 verified end-to-end · 🟡 implemented, integration-testing · 🔵 in development · ⚪ planned
+
+| Area | | |
 |---|---|---|
-| 0 | Desktop + Android shells | ✅ desktop · Android stub |
-| 1 | VS Code-like manual editor | ✅ Monaco, tree, tabs, save, terminal |
-| 2 | Language support (LSP) | ✅ pyright + tsserver: diagnostics, completion, hover, definition, format |
-| 3 | Nemotron assistant | ✅ right-click Fix/Refactor/… + Ctrl+K, diff-accept; inline completions (opt-in) |
-| 4 | Autonomous coding loop | ✅ plan → edit → test → debug → review → commit; verified greenfield + bug-fix |
-| 5 | Git + rollback | ✅ stage/commit/checkpoint/restore panel |
-| 6 | Computer agent | ✅ files/apps/PowerShell outside the workspace, approval-gated |
-| 7 | Android command/control | ✅ `GET /mobile` LAN page + native APK (`scripts/build-apk.ps1`) |
-| 8 | Multi-language expansion | ✅ manifest-driven packs: +json/html/css/bash bundled, rust/go/clangd via PATH |
-| 9 | OS development agent | ✅ build → boot kernel/ISO in QEMU, capture serial, iterate |
-| 10 | Authorized security engineering | ✅ scope-gated: defensive audits + connect-only checks, no offense |
+| Core API + orchestrator + agents | 🟢 | 140 tests; autonomous loop verified greenfield + bug-fix against live Nemotron |
+| Tool registry + policy + approvals | 🟢 | typed tools, risk levels, elevated calls park for approval, critical blocked |
+| Git checkpoint / diff / rollback | 🟢 | `vajra/*` tags, per-write diff+rollback, restore touches only Vajra changes |
+| Language engine (LSP/DAP/format) | 🟢 | 17 languages resolve (pyright, tsserver, clangd, gopls, rust-analyzer, …) |
+| RAG semantic index | 🟢 | offline lexical vectors by default; OpenAI-compatible `/embeddings` opt-in |
+| Computer agent | 🟢 | files/apps/PowerShell outside the workspace, approval-gated |
+| OS-development agent | 🟢 | builds + boots a real multiboot kernel in QEMU, reads serial, iterates |
+| Authorized-security agent | 🟢 | scope-gated defensive audits + connect-only checks, no offense |
+| Device pairing + security hardening | 🟡 | random device secret, one-time PIN pairing, CORS lockdown, rate limit, `/api/v1` |
+| **Vajra AI Studio** (Code-OSS fork) | 🟡 | builds + launches, Vajra extension loads as a built-in; full GUI QA pending |
+| Vajra extension (chat/assist/tests/…) | 🟡 | `tsc` clean, every endpoint verified vs the Core; not click-tested in an Ext Host |
+| Vajra Mobile (Android) | 🟡 | `GET /mobile` LAN page 🟢; native APK builds 🟡; secure QR pairing 🔵 |
+| Windows installer | 🟢 | `studio\build.ps1 -Setup` → `VajraAIStudioSetup-x64.exe` (Inno) |
+| CI (GitHub Actions) | 🟡 | `.github/workflows/ci.yml` — ruff/pytest, ext build, secret scan, Flutter |
 
-Plus: split editor (Ctrl+\), DAP debugging, dev-server management, command
-palette / quick-open / project search, Problems panel, status bar,
-project-memory learning loop.
-
-See `docs/` and *Vajra AI Studio Complete Developer Manual v3.0*.
+See `docs/`, `studio/README.md`, and *Vajra AI Studio Complete Developer Manual v3.0*.

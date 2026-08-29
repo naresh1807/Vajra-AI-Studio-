@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    name: Core (ruff + pytest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check core tests database
+      - name: Test
+        env:
+          VAJRA_PAIRING_TOKEN: ci-strong-test-token-000000000000
+        run: pytest -q
+
+  extension:
+    name: VS Code extension (tsc + build + package)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - working-directory: vscode-extension
+        run: |
+          npm install
+          npm run lint
+          npm run build
+          npx vsce package -o vajra-ai.vsix --allow-missing-repository
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vajra-ai-vsix
+          path: vscode-extension/vajra-ai.vsix
+
+  language-servers:
+    name: extensions/language-servers install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - working-directory: extensions/language-servers
+        run: npm install
+      - working-directory: .
+        run: |
+          pip install -e ".[dev]"
+          pytest -q tests/test_lsp.py
+
+  mobile:
+    name: Flutter (analyze + test)
+    runs-on: ubuntu-latest
+    continue-on-error: true # SDK availability / template drift shouldn't block PRs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - working-directory: mobile-android/flutter_app
+        run: |
+          flutter create --org ai.vajra --project-name vajra_companion --platforms android .
+          flutter pub get
+          flutter analyze
+          flutter test
+
+  security:
+    name: Secret scan + dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Secret scan (Vajra's own auditor)
+        run: |
+          pip install -e ".[dev]"
+          python -c "from core.security.audit import secret_scan; r = secret_scan('.'); [print(f.severity, f.location, f.detail) for f in r.findings]; import sys; sys.exit(1 if not r.ok else 0)"
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit || true

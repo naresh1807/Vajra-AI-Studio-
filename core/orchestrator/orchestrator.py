@@ -154,6 +154,7 @@ class Orchestrator:
             "changed_files": sorted(set(changed_files)),
             "tasks": [t.model_dump() for t in graph.tasks],
         }
+        self._learn(memory, graph, succeeded)
         memory.record_task(goal, "passed" if succeeded else "failed", result["changed_files"])
         await self.events.record(
             "report", goal_id=goal_id, succeeded=succeeded,
@@ -285,6 +286,24 @@ class Orchestrator:
             "plan.created", goal_id=graph.goal_id,
             note=f"debug round {graph.debug_rounds}", tasks=[debug.title, retest.title],
         )
+
+    @staticmethod
+    def _learn(memory: WorkspaceMemory, graph: TaskGraph, succeeded: bool) -> None:
+        """Fold what happened this run into .vajra/ so future runs start smarter
+        (manual v3.0 section 14: decisions + known recurring errors)."""
+        if not succeeded:
+            return
+        # a debug round that then went green -> a known error + its fix
+        for t in graph.tasks:
+            if t.title.startswith("debug:") and t.state == TaskState.PASSED and t.instruction:
+                sig = t.instruction.split("\n", 1)[0][:200]
+                fix = (t.result_summary or "root cause fixed")[:300]
+                memory.record_known_error(sig, fix)
+        # the reviewer's verdict -> an architecture/decision note
+        for t in graph.tasks:
+            if t.agent == "reviewer" and t.state == TaskState.PASSED and t.result_summary:
+                memory.record_decision(f"{graph.goal[:120]}", t.result_summary[:400])
+                break
 
     async def _final_gate(self, goal_id: str, ctx: AgentContext) -> bool | None:
         """Run the workspace test/build once at the end. Returns green/red, or

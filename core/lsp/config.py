@@ -1,61 +1,85 @@
-"""Language -> language-server command mapping.
+"""Language -> language-server resolution, driven by a manifest.
 
-Servers are bundled under extensions/language-servers/ so the IDE stays
-local-first (manual v3.0 sections 5 and 28). Falls back to PATH.
+Language packs are declared in ``extensions/language-servers/servers.json`` so
+adding a language never touches Core code (manual v3.0 section 5, "do not
+hard-code language features"). Servers are bundled under
+``extensions/language-servers/node_modules`` (run with the bundled ``node`` so
+this works on Windows, where the ``.bin/*.cmd`` shims are not valid Win32
+executables); packs may instead name a ``command`` resolved from PATH.
 """
 
 from __future__ import annotations
 
+import json
 import shutil
+from functools import lru_cache
 
 from core.config import REPO_ROOT
 
-_NM = REPO_ROOT / "extensions" / "language-servers" / "node_modules"
+_ROOT = REPO_ROOT / "extensions" / "language-servers"
+_NM = _ROOT / "node_modules"
+_MANIFEST = _ROOT / "servers.json"
 _NODE = shutil.which("node")
 
-# Real JS entrypoints - run with `node` so this works on Windows (where the
-# .bin/*.cmd shims are not valid Win32 executables for CreateProcess).
-_JS_ENTRY: dict[str, tuple[str, ...]] = {
-    "pyright": ("pyright", "langserver.index.js"),
-    "tsls": ("typescript-language-server", "lib", "cli.mjs"),
-}
+
+@lru_cache(maxsize=1)
+def _packs() -> list[dict]:
+    try:
+        data = json.loads(_MANIFEST.read_text("utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [p for p in data.get("packs", []) if isinstance(p, dict)]
 
 
-def _node_server(entry_key: str, *extra: str) -> list[str] | None:
-    if not _NODE:
-        return None
-    js = _NM.joinpath(*_JS_ENTRY[entry_key])
-    if not js.exists():
-        return None
-    return [_NODE, str(js), *extra]
+def _pack_for(language: str) -> dict | None:
+    for pack in _packs():
+        if language in pack.get("languages", []):
+            return pack
+    return None
 
 
-#: language id -> factory
-_SERVERS = {
-    "python": lambda: _node_server("pyright", "--stdio"),
-    "typescript": lambda: _node_server("tsls", "--stdio"),
-    "javascript": lambda: _node_server("tsls", "--stdio"),
-    "typescriptreact": lambda: _node_server("tsls", "--stdio"),
-    "javascriptreact": lambda: _node_server("tsls", "--stdio"),
-}
-
-_LSP_LANGUAGE_ID = {
-    "python": "python",
-    "typescript": "typescript",
-    "javascript": "javascript",
-    "typescriptreact": "typescriptreact",
-    "javascriptreact": "javascriptreact",
-}
+def _argv(pack: dict) -> list[str] | None:
+    args = list(pack.get("args", []))
+    if "node" in pack:
+        if not _NODE:
+            return None
+        entry = _NM.joinpath(*pack["node"])
+        if not entry.exists():
+            return None
+        return [_NODE, str(entry), *args]
+    if "command" in pack:
+        exe = shutil.which(pack["command"])
+        return [exe, *args] if exe else None
+    return None
 
 
 def server_for(language: str) -> list[str] | None:
-    factory = _SERVERS.get(language)
-    return factory() if factory else None
+    pack = _pack_for(language)
+    return _argv(pack) if pack else None
+
+
+def pool_for(language: str) -> str:
+    """Stable key for the server process shared by a group of languages."""
+    pack = _pack_for(language)
+    return pack.get("pool", language) if pack else language
 
 
 def lsp_language_id(language: str) -> str:
-    return _LSP_LANGUAGE_ID.get(language, language)
+    pack = _pack_for(language)
+    if pack:
+        return pack.get("lspLanguageId", {}).get(language, language)
+    return language
+
+
+def declared_languages() -> list[str]:
+    seen: list[str] = []
+    for pack in _packs():
+        for lang in pack.get("languages", []):
+            if lang not in seen:
+                seen.append(lang)
+    return seen
 
 
 def supported() -> dict[str, bool]:
-    return {lang: server_for(lang) is not None for lang in ("python", "typescript", "javascript")}
+    """{language: whether its server is actually installed and resolvable}."""
+    return {lang: server_for(lang) is not None for lang in declared_languages()}

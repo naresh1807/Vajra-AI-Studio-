@@ -6,7 +6,7 @@ import asyncio
 import logging
 
 from core.lsp.client import LspClient
-from core.lsp.config import lsp_language_id, server_for
+from core.lsp.config import lsp_language_id, pool_for, server_for
 
 log = logging.getLogger("vajra.lsp")
 
@@ -23,7 +23,7 @@ class LspManager:
         argv = server_for(language)
         if not argv:
             return None
-        key = (root, language if language in ("python",) else "ts")
+        key = (root, pool_for(language))
         async with self._lock(key):
             client = self._clients.get(key)
             if client and client.alive:

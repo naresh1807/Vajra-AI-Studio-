@@ -6,12 +6,37 @@ import asyncio
 
 import pytest
 
-from core.lsp.config import server_for
+from core.lsp.config import declared_languages, pool_for, server_for
 from core.lsp.manager import LspManager
 
 pytestmark = pytest.mark.skipif(
     server_for("python") is None, reason="pyright not installed under extensions/language-servers"
 )
+
+
+def test_manifest_declares_multiple_languages():
+    langs = declared_languages()
+    assert {"python", "typescript", "javascript"} <= set(langs)
+    # ts + js share one server process
+    assert pool_for("typescript") == pool_for("javascript")
+    assert pool_for("python") != pool_for("typescript")
+
+
+@pytest.mark.skipif(server_for("json") is None, reason="json language server not installed")
+async def test_json_diagnostics(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"a": 1,}\n', encoding="utf-8")
+    mgr = LspManager()
+    try:
+        client = await mgr.sync(str(tmp_path), str(bad), bad.read_text(), "json")
+        assert client is not None
+        for _ in range(20):
+            await asyncio.sleep(0.3)
+            if client.diagnostics(str(bad)):
+                break
+        assert client.diagnostics(str(bad)), "expected a trailing-comma diagnostic"
+    finally:
+        await mgr.shutdown_all()
 
 
 async def test_python_diagnostics(tmp_path):

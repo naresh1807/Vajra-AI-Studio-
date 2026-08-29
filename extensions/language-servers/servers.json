@@ -1,0 +1,66 @@
+{
+  "_comment": "Vajra language packs (manual v3.0 section 5). Add an entry + install the server to teach the IDE a new language - no Core code changes. 'node' = path segments under this folder's node_modules, run with the bundled node. 'command' = an executable resolved from PATH (install the toolchain yourself). 'args' are appended. 'pool' groups languages that share one server process. 'lspLanguageId' overrides the id sent to the server. See extensions/README.md.",
+  "packs": [
+    {
+      "id": "pyright",
+      "languages": ["python"],
+      "node": ["pyright", "langserver.index.js"],
+      "args": ["--stdio"],
+      "pool": "python"
+    },
+    {
+      "id": "typescript-language-server",
+      "languages": ["typescript", "javascript", "typescriptreact", "javascriptreact"],
+      "node": ["typescript-language-server", "lib", "cli.mjs"],
+      "args": ["--stdio"],
+      "pool": "typescript"
+    },
+    {
+      "id": "vscode-json",
+      "languages": ["json", "jsonc"],
+      "node": ["vscode-langservers-extracted", "bin", "vscode-json-language-server"],
+      "args": ["--stdio"],
+      "pool": "json"
+    },
+    {
+      "id": "vscode-html",
+      "languages": ["html"],
+      "node": ["vscode-langservers-extracted", "bin", "vscode-html-language-server"],
+      "args": ["--stdio"],
+      "pool": "html"
+    },
+    {
+      "id": "vscode-css",
+      "languages": ["css", "scss", "less"],
+      "node": ["vscode-langservers-extracted", "bin", "vscode-css-language-server"],
+      "args": ["--stdio"],
+      "pool": "css"
+    },
+    {
+      "id": "bash-language-server",
+      "languages": ["shellscript", "shell"],
+      "node": ["bash-language-server", "out", "cli.js"],
+      "args": ["start"],
+      "pool": "bash",
+      "lspLanguageId": { "shell": "shellscript" }
+    },
+    {
+      "id": "rust-analyzer",
+      "languages": ["rust"],
+      "command": "rust-analyzer",
+      "pool": "rust"
+    },
+    {
+      "id": "gopls",
+      "languages": ["go"],
+      "command": "gopls",
+      "pool": "go"
+    },
+    {
+      "id": "clangd",
+      "languages": ["c", "cpp"],
+      "command": "clangd",
+      "pool": "clangd"
+    }
+  ]
+}

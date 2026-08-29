@@ -80,6 +80,7 @@ from core.dap import dap_manager
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
 from core.lsp import lsp_manager
+from core.lsp.config import declared_languages as lsp_declared
 from core.lsp.config import supported as lsp_supported
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
@@ -379,7 +380,11 @@ async def assist_complete(req: InlineCompleteRequest) -> dict:
 # -- language server (diagnostics / hover / completion / definition) --
 @app.get("/api/lsp/support", dependencies=AUTH)
 async def lsp_support() -> dict:
-    return {"languages": lsp_supported(), "servers": lsp_manager.status()}
+    return {
+        "languages": lsp_supported(),
+        "declared": lsp_declared(),
+        "servers": lsp_manager.status(),
+    }
 
 
 @app.post("/api/lsp/diagnostics", dependencies=AUTH)

@@ -32,6 +32,26 @@ scripts\build.ps1                      # ~30-45 min first time
 
 Dev run (no packaging): `cd studio\vscode ; .\scripts\code.bat`
 
+## Extensions & the marketplace
+
+Studio ships with the **Open VSX** gallery (fully open, no Microsoft ToU
+strings). To get **GitHub Copilot / Claude Code / ChatGPT / Gemini** — which are
+Microsoft-Marketplace-only — switch the gallery:
+
+```powershell
+scripts\bootstrap.ps1 -Marketplace ms          # at setup time
+node scripts\set-marketplace.mjs ms studio\vscode   # or any time, then rebuild / restart
+```
+
+or from inside Studio: **`Vajra: Set Extension Gallery`**. Microsoft's Marketplace
+ToU restrict it to Microsoft products and they can rate-limit forks — that's the
+same trade-off Cursor / Windsurf make; opt in knowingly.
+
+**Always works regardless of gallery:** *Extensions ▸ … ▸ Install from VSIX…*
+(download any `.vsix` from the Marketplace website). And **`Vajra: Install AI
+Extensions`** offers a one-click pick list (Copilot, Claude Code, ChatGPT,
+Gemini, Continue, Codeium, Cody).
+
 ## What's Vajra vs upstream
 
 Everything Vajra-specific lives in **one built-in extension** (`extensions/vajra`),

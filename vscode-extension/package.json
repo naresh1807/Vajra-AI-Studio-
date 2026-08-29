@@ -20,6 +20,8 @@
       { "command": "vajra.checkpoint", "title": "Vajra: Create Checkpoint" },
       { "command": "vajra.reindex", "title": "Vajra: Rebuild Semantic Index" },
       { "command": "vajra.discoverTests", "title": "Vajra: Discover Tests" },
+      { "command": "vajra.setMarketplace", "title": "Vajra: Set Extension Gallery (Open VSX / Microsoft)" },
+      { "command": "vajra.installAIExtensions", "title": "Vajra: Install AI Extensions (Copilot, Claude Code, ChatGPT…)" },
       { "command": "vajra.assist.edit", "title": "Vajra: Edit with instruction… (Ctrl+K)" },
       { "command": "vajra.assist.explain", "title": "Vajra: Explain" },
       { "command": "vajra.assist.fix", "title": "Vajra: Fix" },

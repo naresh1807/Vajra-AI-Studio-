@@ -1,0 +1,11 @@
+{
+  "_comment": "Microsoft VS Code Marketplace - gives you GitHub Copilot, Claude Code, ChatGPT, etc. NOTE: Microsoft's Marketplace Terms of Use restrict it to Microsoft products; using it from a fork is what Cursor / Windsurf do, and Microsoft can rate-limit or block non-MS clients. Opt in with your eyes open. Extensions installed from a .vsix file always work regardless of this setting.",
+  "extensionsGallery": {
+    "serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
+    "itemUrl": "https://marketplace.visualstudio.com/items",
+    "resourceUrlTemplate": "https://{publisher}.vscode-unpkg.net/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "https://main.vscode-cdn.net/extensions/marketplace.json",
+    "nlsBaseUrl": "https://www.vscode-unpkg.net/_lp/",
+    "publisherUrl": "https://marketplace.visualstudio.com/publishers"
+  }
+}

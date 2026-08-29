@@ -12,6 +12,8 @@ if (-not (Test-Path (Join-Path $vscode "node_modules"))) {
 Push-Location $vscode
 try {
   node (Join-Path $PSScriptRoot "apply-overrides.mjs") $vscode   # re-apply after any upstream checkout
+  $mk = if (Test-Path (Join-Path $vscode ".vajra-marketplace")) { Get-Content (Join-Path $vscode ".vajra-marketplace") } else { "openvsx" }
+  node (Join-Path $PSScriptRoot "set-marketplace.mjs") $mk $vscode
   npm run gulp -- vscode-win32-x64-min
   $out = Join-Path (Split-Path $vscode -Parent) "..\VSCode-win32-x64"
   $target = Join-Path $studio "VajraAIStudio-win32-x64"

@@ -1,0 +1,11 @@
+{
+  "_comment": "Open VSX - fully open, no Microsoft ToU restrictions. Default. Has most OSS extensions; NOT GitHub Copilot.",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "",
+    "nlsBaseUrl": "",
+    "publisherUrl": ""
+  }
+}

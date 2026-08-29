@@ -72,10 +72,22 @@ llama.cpp). Swapping providers needs no agent-code changes.
   event (`logs/task_events.jsonl` + DB); secrets are redacted before persistence.
 - **Bounded autonomy** — 2 same-strategy retries, then re-plan. No infinite loops.
 
-## Roadmap (v3.0)
+## Status (manual v3.0 roadmap)
 
-0 shells · 1 manual editor · 2 language support (LSP) · 3 Nemotron assistant ·
-**4 autonomous loop (working)** · 5 Git + rollback · 6 computer agent · 7 Android ·
-8 multi-language · 9 OS agent · 10 authorized security.
+| Phase | | |
+|---|---|---|
+| 0 | Desktop + Android shells | ✅ desktop · Android stub |
+| 1 | VS Code-like manual editor | ✅ Monaco, tree, tabs, save, terminal |
+| 2 | Language support (LSP) | ✅ pyright + tsserver: diagnostics, completion, hover, definition, format |
+| 3 | Nemotron assistant | ✅ right-click Fix/Refactor/… + Ctrl+K, diff-accept; inline completions (opt-in) |
+| 4 | Autonomous coding loop | ✅ plan → edit → test → debug → review → commit; verified greenfield + bug-fix |
+| 5 | Git + rollback | ✅ stage/commit/checkpoint/restore panel |
+| 6 | Computer agent | ✅ files/apps/PowerShell outside the workspace, approval-gated |
+| 7 | Android command/control | ⬜ |
+| 9 | OS development agent | ⬜ |
+| 10 | Authorized security engineering | ⬜ |
+
+Plus: DAP debugging, dev-server management, command palette / quick-open /
+project search, Problems panel, status bar, project-memory learning loop.
 
 See `docs/` and *Vajra AI Studio Complete Developer Manual v3.0*.

@@ -12,7 +12,7 @@ import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from core.llm import ChatMessage, ModelRouter, ToolSpec
+from core.llm import ChatMessage, ModelRouter, PromptBuilder, ToolSpec
 from core.tools import ToolCall, ToolContext, ToolRegistry
 
 READ_ONLY_TOOLS = (
@@ -56,11 +56,15 @@ class ChatAgent:
             return None
         return [s for s in self.registry.specs() if s.name in READ_ONLY_TOOLS]
 
-    def _prime(self, history: list[ChatMessage], workspace_summary: str) -> list[ChatMessage]:
-        sys = _SYSTEM
-        if workspace_summary:
-            sys += f"\n\n# Current workspace\n{workspace_summary}"
-        return [ChatMessage(role="system", content=sys), *history]
+    def _prime(
+        self, history: list[ChatMessage], workspace_summary: str, retrieved: str = ""
+    ) -> list[ChatMessage]:
+        return (
+            PromptBuilder(_SYSTEM)
+            .add_section("Current workspace", workspace_summary)
+            .add_section("Relevant code (retrieved automatically)", retrieved)
+            .build(history)
+        )
 
     async def _retrieve(self, workspace_root: str | None, history: list[ChatMessage]) -> str:
         """Pull the most relevant workspace chunks for the latest user turn."""
@@ -78,11 +82,7 @@ class ChatAgent:
         hits = [h for h in hits if h.score > 0.15]
         if not hits:
             return ""
-        blocks = "\n\n".join(f"# {h.ref}\n{h.text}" for h in hits)
-        return (
-            "Relevant code from the workspace (retrieved automatically - cite paths, "
-            "and read the full file if you need more):\n\n" + blocks
-        )
+        return "\n\n".join(f"## {h.ref}\n{h.text}" for h in hits)
 
     async def respond(
         self,
@@ -91,13 +91,10 @@ class ChatAgent:
         workspace_summary: str = "",
     ) -> ChatTurn:
         turn = ChatTurn(reply="", tool_calls=[], model="", provider="")
-        messages = self._prime(history, workspace_summary)
+        retrieved = await self._retrieve(workspace_root, history)
+        messages = self._prime(history, workspace_summary, retrieved)
         specs = self._specs(workspace_root)
         tool_ctx = ToolContext(workspace_root=workspace_root) if workspace_root else None
-
-        retrieved = await self._retrieve(workspace_root, history)
-        if retrieved:
-            messages.insert(1, ChatMessage(role="user", content=retrieved))
 
         for _hop in range(_MAX_TOOL_HOPS):
             resp = await self.router.complete(messages, tools=specs, max_tokens=1200)

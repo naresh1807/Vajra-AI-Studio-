@@ -8,7 +8,7 @@ import asyncio
 import logging
 
 from core.config import ModelConfig, get_model_config
-from core.llm.client import (
+from core.llm.nemotron_client import (
     ChatMessage,
     LLMClientError,
     LLMResponse,

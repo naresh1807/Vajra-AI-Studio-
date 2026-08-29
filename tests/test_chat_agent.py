@@ -1,7 +1,6 @@
 
 from core.agents.chat_agent import ChatAgent
-from core.llm import ChatMessage, LLMResponse
-from core.llm.client import ToolCall
+from core.llm import ChatMessage, LLMResponse, ToolCall
 from core.tools import build_default_registry
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from core.llm.client import ToolSpec
+from core.llm import ToolSpec
 from core.policy.engine import PolicyDecision, PolicyEngine, ToolAction
 from core.tools.base import Tool, ToolCall, ToolContext, ToolResult
 

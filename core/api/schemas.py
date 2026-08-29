@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class OpenProjectRequest(BaseModel):
     root_path: str
     name: str | None = None
+    create: bool = False  # mkdir the folder if it does not exist
 
 
 class ProjectInfo(BaseModel):

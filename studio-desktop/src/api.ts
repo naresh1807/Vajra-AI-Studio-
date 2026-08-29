@@ -61,11 +61,11 @@ export class Api {
     return this.j<{ status: string; version: string; models: Record<string, string> }>(`/api/health`);
   }
 
-  openProject(rootPath: string) {
+  openProject(rootPath: string, create = false) {
     return this.j<{ id: string; name: string; root_path: string; profile: any }>(`/api/projects`, {
       method: "POST",
       headers: this.h(),
-      body: JSON.stringify({ root_path: rootPath }),
+      body: JSON.stringify({ root_path: rootPath, create }),
     });
   }
 

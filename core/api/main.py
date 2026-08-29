@@ -155,7 +155,17 @@ async def ping() -> SimpleOk:
 # -- projects --------------------------------------------------------
 @app.post("/api/projects", dependencies=AUTH)
 async def open_project(req: OpenProjectRequest) -> ProjectInfo:
-    profile = discover_workspace(req.root_path)
+    target = Path(req.root_path).expanduser()
+    if not target.exists():
+        if not req.create:
+            raise HTTPException(400, f"folder does not exist: {target}")
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise HTTPException(400, f"cannot create folder: {exc}") from exc
+    if not target.is_dir():
+        raise HTTPException(400, f"not a directory: {target}")
+    profile = discover_workspace(str(target))
     name = req.name or Path(profile.root).name or "project"
     pid = await db.upsert_project(name, profile.root, profile.model_dump())
     return ProjectInfo(id=pid, name=name, root_path=profile.root, profile=profile.model_dump())

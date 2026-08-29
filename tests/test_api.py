@@ -54,6 +54,15 @@ def test_open_project_and_context(client, tmp_workspace):
     assert "python" in ctx.json()["profile"]["languages"]
 
 
+def test_open_project_creates_folder(client, tmp_path):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    newdir = str(tmp_path / "brand-new")
+    assert c.post("/api/projects", json={"root_path": newdir}, headers=h).status_code == 400
+    r = c.post("/api/projects", json={"root_path": newdir, "create": True}, headers=h)
+    assert r.status_code == 200
+
+
 def test_workspace_tree(client, tmp_workspace):
     c, token = client
     r = c.get("/api/workspace/tree", params={"root": str(tmp_workspace)}, headers={"X-Vajra-Token": token})

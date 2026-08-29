@@ -72,16 +72,29 @@ export function App() {
   }, [root, loadTree]);
 
   async function openFolder() {
-    const r = window.prompt("Absolute path to a project folder", root || settings.lastWorkspace || "");
+    const r = window.prompt(
+      "Absolute path to a project folder (new or existing)",
+      root || settings.lastWorkspace || "",
+    );
     if (!r) return;
-    try {
-      const p = await api.openProject(r);
-      setRoot(p.root_path);
-      const next = { ...settings, lastWorkspace: p.root_path };
+    const commit = (path: string) => {
+      setRoot(path);
+      const next = { ...settings, lastWorkspace: path };
       setSettings(next);
       saveSettings(next);
+    };
+    try {
+      commit((await api.openProject(r)).root_path);
     } catch (e) {
-      setToast(`open: ${e}`);
+      if (String(e).includes("does not exist") && window.confirm(`Create new project folder?\n\n${r}`)) {
+        try {
+          commit((await api.openProject(r, true)).root_path);
+        } catch (e2) {
+          setToast(`create: ${e2}`);
+        }
+      } else {
+        setToast(`open: ${e}`);
+      }
     }
   }
 

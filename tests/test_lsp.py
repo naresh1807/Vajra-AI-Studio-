@@ -22,6 +22,36 @@ def test_manifest_declares_multiple_languages():
     assert pool_for("python") != pool_for("typescript")
 
 
+@pytest.mark.skipif(server_for("cpp") is None, reason="clangd not installed")
+async def test_clangd_diagnostics(tmp_path):
+    src = tmp_path / "m.c"
+    src.write_text("int main(){ return nope; }\n", encoding="utf-8")
+    mgr = LspManager()
+    try:
+        client = await mgr.sync(str(tmp_path), str(src), src.read_text(), "c")
+        assert client is not None
+        for _ in range(30):
+            await asyncio.sleep(0.4)
+            if client.diagnostics(str(src)):
+                break
+        assert client.diagnostics(str(src)), "expected an undeclared-identifier diagnostic from clangd"
+    finally:
+        await mgr.shutdown_all()
+
+
+@pytest.mark.skipif(server_for("go") is None, reason="gopls not installed")
+async def test_gopls_starts(tmp_path):
+    (tmp_path / "go.mod").write_text("module m\n\ngo 1.21\n", encoding="utf-8")
+    src = tmp_path / "m.go"
+    src.write_text("package main\n\nfunc main() {}\n", encoding="utf-8")
+    mgr = LspManager()
+    try:
+        client = await mgr.sync(str(tmp_path), str(src), src.read_text(), "go")
+        assert client is not None and client.alive
+    finally:
+        await mgr.shutdown_all()
+
+
 @pytest.mark.skipif(server_for("json") is None, reason="json language server not installed")
 async def test_json_diagnostics(tmp_path):
     bad = tmp_path / "bad.json"

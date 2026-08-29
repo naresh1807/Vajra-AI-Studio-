@@ -14,7 +14,6 @@
   "linuxIconName": "vajra-ai-studio",
   "reportIssueUrl": "https://github.com/vajra-ai/studio/issues/new",
   "urlProtocol": "vajra-studio",
-  "quality": "stable",
   "enableTelemetry": false,
   "enableCrashReporter": false,
   "builtInExtensions": []

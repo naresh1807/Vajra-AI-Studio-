@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { monaco, langFor } from "./monaco";
-import { installLsp, installInlineCompletions, installFormatters, refreshDiagnostics, LspCtx } from "./lsp";
+import { installLsp, installInlineCompletions, installFormatters, LspCtx } from "./lsp";
+import { acquireModel, releaseModel, syncModelContent, configureModels } from "./models";
 
 export interface OpenDoc {
   path: string;
@@ -37,6 +38,10 @@ export function EditorArea({
   onToggleBreakpoint,
   stoppedLine = null,
   actionRef,
+  single = null,
+  onSplit,
+  onCloseSplit,
+  onFocus,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -53,16 +58,22 @@ export function EditorArea({
   onToggleBreakpoint?: (line: number) => void;
   stoppedLine?: number | null;
   actionRef?: { current: { format: () => void } | null };
+  /** when set, this pane shows only this file (no tab bar) — the split view */
+  single?: string | null;
+  onSplit?: () => void;
+  onCloseSplit?: () => void;
+  onFocus?: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const models = useRef<Map<string, monaco.editor.ITextModel>>(new Map());
+  const acquired = useRef<string | null>(null);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onAssistRef = useRef(onAssist);
   const lspCtxRef = useRef(lspCtx);
   const inlineEnabledRef = useRef(inlineEnabled);
   const onToggleBpRef = useRef(onToggleBreakpoint);
+  const onFocusRef = useRef(onFocus);
   const decoRef = useRef<string[]>([]);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
@@ -70,11 +81,15 @@ export function EditorArea({
   lspCtxRef.current = lspCtx;
   inlineEnabledRef.current = inlineEnabled;
   onToggleBpRef.current = onToggleBreakpoint;
+  onFocusRef.current = onFocus;
+
+  const target = single ?? active;
 
   useEffect(() => {
     installLsp(() => lspCtxRef.current(), onOpenPath);
     installInlineCompletions(() => lspCtxRef.current(), () => inlineEnabledRef.current);
     installFormatters(() => lspCtxRef.current());
+    configureModels((p, v) => onChangeRef.current(p, v), () => lspCtxRef.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -84,7 +99,7 @@ export function EditorArea({
       automaticLayout: true,
       theme: "vs-dark",
       fontSize: 13,
-      minimap: { enabled: true },
+      minimap: { enabled: !single },
       scrollBeyondLastLine: false,
       tabSize: 2,
       inlineSuggest: { enabled: true },
@@ -92,6 +107,7 @@ export function EditorArea({
     });
     editor.current = ed;
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());
+    ed.onDidFocusEditorText(() => onFocusRef.current?.());
     ed.onMouseDown((e) => {
       if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && e.target.position) {
         onToggleBpRef.current?.(e.target.position.lineNumber);
@@ -131,43 +147,45 @@ export function EditorArea({
 
     return () => {
       ed.dispose();
-      models.current.forEach((m) => m.dispose());
-      models.current.clear();
+      if (acquired.current) {
+        releaseModel(acquired.current);
+        acquired.current = null;
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // sync model for the active doc
-  useEffect(() => {
-    if (!editor.current) return;
-    if (!active) {
-      editor.current.setModel(null);
-      return;
-    }
-    const doc = docs.find((d) => d.path === active);
-    if (!doc) return;
-    const language = langFor(active);
-    let model = models.current.get(active);
-    if (!model) {
-      model = monaco.editor.createModel(doc.content, language);
-      (model as any).__vajraPath = active;
-      models.current.set(active, model);
-      const m = model;
-      m.onDidChangeContent(() => {
-        onChangeRef.current(active, m.getValue());
-        refreshDiagnostics(() => lspCtxRef.current(), m, active, language);
-      });
-      refreshDiagnostics(() => lspCtxRef.current(), model, active, language);
-    } else if (model.getValue() !== doc.content && !doc.dirty) {
-      model.setValue(doc.content);
-    }
-    editor.current.setModel(model);
-    editor.current.focus();
-  }, [active, docs]);
-
-  // breakpoint + stopped-line decorations
+  // attach the shared model for the target doc
   useEffect(() => {
     const ed = editor.current;
     if (!ed) return;
+    if (!target) {
+      ed.setModel(null);
+      if (acquired.current) {
+        releaseModel(acquired.current);
+        acquired.current = null;
+      }
+      return;
+    }
+    const doc = docs.find((d) => d.path === target);
+    if (!doc) return;
+
+    if (acquired.current !== target) {
+      const prev = acquired.current;
+      const model = acquireModel(target, doc.content);
+      acquired.current = target;
+      if (prev) releaseModel(prev);
+      ed.setModel(model);
+    } else if (!doc.dirty) {
+      syncModelContent(target, doc.content);
+    }
+    if (!single) ed.focus();
+  }, [target, docs, single]);
+
+  // breakpoint + stopped-line decorations (primary pane only)
+  useEffect(() => {
+    const ed = editor.current;
+    if (!ed || single) return;
     const decos: monaco.editor.IModelDeltaDecoration[] = breakpoints.map((ln) => ({
       range: new monaco.Range(ln, 1, ln, 1),
       options: { isWholeLine: false, glyphMarginClassName: "bp-glyph" },
@@ -179,11 +197,11 @@ export function EditorArea({
       });
     }
     decoRef.current = ed.deltaDecorations(decoRef.current, decos);
-  }, [breakpoints, stoppedLine, active]);
+  }, [breakpoints, stoppedLine, target, single]);
 
   // reveal a line (from search / go-to-definition)
   useEffect(() => {
-    if (!reveal || !editor.current || active !== reveal.path) return;
+    if (!reveal || !editor.current || target !== reveal.path) return;
     const ed = editor.current;
     const t = setTimeout(() => {
       ed.revealLineInCenter(reveal.line);
@@ -191,18 +209,25 @@ export function EditorArea({
       ed.focus();
     }, 60);
     return () => clearTimeout(t);
-  }, [reveal, active]);
+  }, [reveal, target]);
 
-  // drop models for closed docs
-  useEffect(() => {
-    const openPaths = new Set(docs.map((d) => d.path));
-    for (const [path, model] of models.current) {
-      if (!openPaths.has(path)) {
-        model.dispose();
-        models.current.delete(path);
-      }
-    }
-  }, [docs]);
+  if (single) {
+    const doc = docs.find((d) => d.path === single);
+    return (
+      <div className="editor-area split">
+        <div className="tabs">
+          <div className="tab active" title={single}>
+            <span>{single.split("/").pop()}</span>
+            {doc?.dirty && <span className="dot" />}
+            <button className="x" onClick={() => onCloseSplit?.()} title="Close split">
+              ×
+            </button>
+          </div>
+        </div>
+        <div className="monaco-host" ref={host} />
+      </div>
+    );
+  }
 
   return (
     <div className="editor-area">
@@ -228,6 +253,11 @@ export function EditorArea({
             </button>
           </div>
         ))}
+        {docs.length > 0 && onSplit && (
+          <button className="tab-split" onClick={onSplit} title="Split editor right (Ctrl+\)">
+            ⇔
+          </button>
+        )}
       </div>
       <div className="monaco-host" ref={host} />
     </div>

@@ -88,7 +88,8 @@ llama.cpp). Swapping providers needs no agent-code changes.
 | 9 | OS development agent | ✅ build → boot kernel/ISO in QEMU, capture serial, iterate |
 | 10 | Authorized security engineering | ✅ scope-gated: defensive audits + connect-only checks, no offense |
 
-Plus: DAP debugging, dev-server management, command palette / quick-open /
-project search, Problems panel, status bar, project-memory learning loop.
+Plus: split editor (Ctrl+\), DAP debugging, dev-server management, command
+palette / quick-open / project search, Problems panel, status bar,
+project-memory learning loop.
 
 See `docs/` and *Vajra AI Studio Complete Developer Manual v3.0*.

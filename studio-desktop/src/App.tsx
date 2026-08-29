@@ -50,6 +50,7 @@ export function App() {
   const [tree, setTree] = useState<FileNode | null>(null);
   const [docs, setDocs] = useState<OpenDoc[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [splitPath, setSplitPath] = useState<string | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [showSettings, setShowSettings] = useState(!settings.pairingToken || settings.pairingToken === "change-me-local-only");
   const [toast, setToast] = useState("");
@@ -236,11 +237,16 @@ export function App() {
 
   function closeDoc(path: string) {
     setDocs((d) => d.filter((x) => x.path !== path));
+    if (splitPath === path) setSplitPath(null);
     if (active === path) {
       const rest = docs.filter((x) => x.path !== path);
       setActive(rest.length ? rest[rest.length - 1].path : null);
     }
   }
+
+  const toggleSplit = useCallback(() => {
+    setSplitPath((cur) => (cur ? null : active));
+  }, [active]);
 
   useEffect(() => {
     if (!toast) return;
@@ -258,6 +264,7 @@ export function App() {
         hint: "Shift+Alt+F",
         run: () => editorApiRef.current?.format(),
       },
+      { id: "split", label: "View: Toggle Split Editor", hint: "Ctrl+\\", run: toggleSplit },
       { id: "explorer", label: "View: Explorer", run: () => setLeftTab("explorer") },
       { id: "search", label: "View: Search", hint: "Ctrl+Shift+F", run: () => setLeftTab("search") },
       { id: "scm", label: "View: Source Control", run: () => setLeftTab("git") },
@@ -270,7 +277,7 @@ export function App() {
       { id: "settings", label: "Open Settings", run: () => setShowSettings(true) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [root, api, saveActive, runAssist],
+    [root, api, saveActive, runAssist, toggleSplit],
   );
 
   const fileList = useMemo(() => flattenFiles(tree), [tree]);
@@ -355,13 +362,16 @@ export function App() {
       } else if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
         e.preventDefault();
         setLeftTab("search");
+      } else if (e.ctrlKey && !e.shiftKey && e.key === "\\") {
+        e.preventDefault();
+        setSplitPath((cur) => (cur ? null : active));
       } else if (e.key === "Escape") {
         setPalette(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [active]);
 
   return (
     <div className="studio">
@@ -413,23 +423,43 @@ export function App() {
           {leftTab === "search" && <SearchPanel api={api} root={root} onOpen={openFileAt} />}
         </div>
         <div className="center">
-          <EditorArea
-            docs={docs}
-            active={active}
-            onActivate={setActive}
-            onClose={closeDoc}
-            onChange={changeDoc}
-            onSave={saveActive}
-            onAssist={runAssist}
-            lspCtx={() => (root ? { api, root } : null)}
-            onOpenPath={openFileAt}
-            reveal={reveal}
-            inlineEnabled={settings.inlineCompletions}
-            breakpoints={active ? bps[active] ?? [] : []}
-            onToggleBreakpoint={toggleBp}
-            stoppedLine={debugFrame && active && debugFrame.path.endsWith(active) ? debugFrame.line : null}
-            actionRef={editorApiRef}
-          />
+          <div className="editors-row">
+            <EditorArea
+              docs={docs}
+              active={active}
+              onActivate={setActive}
+              onClose={closeDoc}
+              onChange={changeDoc}
+              onSave={saveActive}
+              onAssist={runAssist}
+              lspCtx={() => (root ? { api, root } : null)}
+              onOpenPath={openFileAt}
+              reveal={reveal}
+              inlineEnabled={settings.inlineCompletions}
+              breakpoints={active ? bps[active] ?? [] : []}
+              onToggleBreakpoint={toggleBp}
+              stoppedLine={debugFrame && active && debugFrame.path.endsWith(active) ? debugFrame.line : null}
+              actionRef={editorApiRef}
+              onSplit={toggleSplit}
+            />
+            {splitPath && docs.some((d) => d.path === splitPath) && (
+              <EditorArea
+                docs={docs}
+                active={active}
+                onActivate={setActive}
+                onClose={closeDoc}
+                onChange={changeDoc}
+                onSave={saveActive}
+                onAssist={runAssist}
+                lspCtx={() => (root ? { api, root } : null)}
+                onOpenPath={openFileAt}
+                reveal={reveal}
+                inlineEnabled={settings.inlineCompletions}
+                single={splitPath}
+                onCloseSplit={() => setSplitPath(null)}
+              />
+            )}
+          </div>
           <BottomPanel
             api={api}
             root={root}

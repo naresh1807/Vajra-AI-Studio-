@@ -8,13 +8,21 @@ the **Vajra extension** (`../vscode-extension/`) as a built-in.
 ```
 studio/
   product.overrides.json     rebrand + telemetry-off values merged into product.json
+  marketplace/*.json         Open VSX / Microsoft gallery configs
   scripts/
     bootstrap.ps1            clone Code-OSS @ tag, rebrand, bundle the extension, npm ci
     build.ps1               gulp build -> VajraAIStudio-win32-x64\
     apply-overrides.mjs      idempotent product.json patcher (keeps product.json.orig)
-  vscode/                    the fork (git-ignored; created by bootstrap.ps1)
+    set-marketplace.mjs      switch the extension gallery
+    Directory.Build.targets  native-module build fixups (Spectre off, $(LIB) path)
+    _devenv-*.bat            wrap npm ci / gulp in a VS dev environment (vcvars64)
+  .builddir                  points at the fork checkout (git-ignored)
   VajraAIStudio-win32-x64/   the built app (git-ignored)
 ```
+
+**The fork checkout lives outside this repo**, at a **path without spaces**
+(default `C:\vajra-studio-build\vscode`) — VS Code's own build scripts break on
+spaces in the checkout path. `-BuildDir` overrides it.
 
 ## Build
 

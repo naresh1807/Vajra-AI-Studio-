@@ -46,10 +46,11 @@ class ToolRegistry:
             arguments=call.arguments,
             risk_level=tool.risk,
             workspace_root=ctx.workspace_root,
+            outside_workspace_ok=getattr(tool, "system", False),
         )
         return self._policy.validate(action)
 
-    async def execute(self, call: ToolCall, ctx: ToolContext) -> ToolResult:
+    async def execute(self, call: ToolCall, ctx: ToolContext, approved: bool = False) -> ToolResult:
         tool = self._tools.get(call.tool_name)
         if tool is None:
             return ToolResult.fail(f"unknown tool: {call.tool_name}")
@@ -58,6 +59,11 @@ class ToolRegistry:
             return ToolResult.fail(
                 f"policy blocked {call.tool_name}: {decision.reason}",
                 metadata={"policy": decision.model_dump()},
+            )
+        if decision.requires_approval and not approved:
+            return ToolResult.fail(
+                f"{call.tool_name} requires approval",
+                metadata={"policy": decision.model_dump(), "needs_approval": True},
             )
         try:
             return await asyncio.wait_for(
@@ -115,4 +121,27 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         GitRestoreTool,
     ):
         registry.register(tool_cls())
+    return registry
+
+
+def build_computer_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
+    """Registry for the Computer Agent - acts outside any workspace, so every
+    tool is marked `system` and mutating ones are approval-gated."""
+    from core.tools import computer_tools as ct
+
+    registry = ToolRegistry(policy or PolicyEngine())
+    for tool_cls in (
+        ct.ResolveKnownFolderTool,
+        ct.ListDirTool,
+        ct.FindFilesTool,
+        ct.ListProcessesTool,
+        ct.CreateFolderTool,
+        ct.WriteFileAnywhereTool,
+        ct.OpenPathTool,
+        ct.OpenAppTool,
+        ct.RunPowerShellTool,
+    ):
+        tool = tool_cls()
+        tool.system = True
+        registry.register(tool)
     return registry

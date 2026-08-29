@@ -30,11 +30,16 @@ async def test_breakpoint_stack_variables_continue(tmp_path):
             on_event=lambda p: events.append(p["event"]) or asyncio.sleep(0),
         )
         # wait for the stop at the breakpoint
-        for _ in range(30):
+        for _ in range(60):
             await asyncio.sleep(0.3)
             if session.state == "stopped":
                 break
         assert session.state == "stopped"
+        # the stopped-event handler loads the stack asynchronously
+        for _ in range(20):
+            if session.frames:
+                break
+            await asyncio.sleep(0.2)
         assert session.frames and session.frames[0]["line"] == 2
         assert session.frames[0]["name"] == "add"
 

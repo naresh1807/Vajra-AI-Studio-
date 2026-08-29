@@ -337,6 +337,20 @@ export class Api {
     });
   }
 
+  computerRun(instruction: string) {
+    return this.j<{ id: string; status: string }>(`/api/computer/run`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ instruction }),
+    });
+  }
+  computerRunStatus(id: string) {
+    return this.j<{ id: string; status: string; reply: string; actions: Array<{ tool: string; success: boolean }> }>(
+      `/api/computer/runs/${id}`,
+      { headers: this.h(false) },
+    );
+  }
+
   approvals() {
     return this.j<Array<{ id: string; tool_name: string; reason: string }>>(`/api/approvals`, {
       headers: this.h(false),

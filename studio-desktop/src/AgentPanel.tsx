@@ -14,7 +14,8 @@ export function AgentPanel({
   root: string | null;
   onFilesChanged: () => void;
 }) {
-  const [mode, setMode] = useState<"chat" | "agent">("chat");
+  const [mode, setMode] = useState<"chat" | "agent" | "computer">("chat");
+  const [cmpRun, setCmpRun] = useState<{ id: string; status: string } | null>(null);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,6 +39,32 @@ export function AgentPanel({
     }, 1500);
     return () => clearInterval(t);
   }, [api, run]);
+
+  useEffect(() => {
+    if (!cmpRun || ["passed", "failed"].includes(cmpRun.status)) return;
+    const t = setInterval(async () => {
+      try {
+        const s = await api.computerRunStatus(cmpRun.id);
+        setApprovals(await api.approvals());
+        if (["passed", "failed"].includes(s.status)) {
+          setCmpRun(s);
+          setBusy(false);
+          setBubbles((b) => [
+            ...b,
+            { kind: "assistant", text: s.reply || "(done)" },
+            ...(s.actions?.length
+              ? [{ kind: "system" as const, text: s.actions.map((a: any) => `${a.success ? "✓" : "✗"} ${a.tool}`).join("  ") }]
+              : []),
+          ]);
+          onFilesChanged();
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 1200);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api, cmpRun]);
 
   useEffect(() => {
     if (run && ["passed", "failed"].includes(run.status)) {
@@ -67,6 +94,11 @@ export function AgentPanel({
         const r = await api.chat(text, history(), root ?? undefined);
         for (const tc of r.tool_calls || []) setBubbles((b) => [...b, { kind: "tool", text: tc.tool, ok: tc.success }]);
         setBubbles((b) => [...b, { kind: "assistant", text: r.reply || "(no reply)" }]);
+      } else if (mode === "computer") {
+        const s = await api.computerRun(text);
+        setCmpRun(s);
+        setBubbles((b) => [...b, { kind: "system", text: "Computer task running — approve any prompts below." }]);
+        return; // keep busy; the poller clears it
       } else {
         if (!root) {
           setBubbles((b) => [...b, { kind: "system", text: "Open a folder first." }]);
@@ -94,6 +126,9 @@ export function AgentPanel({
           <button className={mode === "agent" ? "on" : ""} onClick={() => setMode("agent")}>
             Agent
           </button>
+          <button className={mode === "computer" ? "on" : ""} onClick={() => setMode("computer")}>
+            Computer
+          </button>
         </div>
       </div>
 
@@ -102,7 +137,9 @@ export function AgentPanel({
           <div className="muted pad">
             {mode === "chat"
               ? "Ask about the open workspace. Vajra can read your files."
-              : "Describe a task. Vajra will plan → edit → test → review."}
+              : mode === "computer"
+                ? "Computer tasks outside the project: create/find files anywhere, open apps, run local workflows. Mutating steps ask for approval."
+                : "Describe a task. Vajra will plan → edit → test → review."}
           </div>
         )}
         {bubbles.map((b, i) =>

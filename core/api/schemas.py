@@ -204,6 +204,18 @@ class AgentStopRequest(BaseModel):
     run_id: str
 
 
+class ComputerRunRequest(BaseModel):
+    instruction: str = Field(min_length=1)
+
+
+class ComputerRunResult(BaseModel):
+    id: str
+    status: str = "running"
+    reply: str = ""
+    actions: list[dict] = []
+    succeeded: bool = True
+
+
 class ApproveRequest(BaseModel):
     approval_id: str
     verdict: str = "approved"

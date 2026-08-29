@@ -37,6 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.agents.assist_agent import AssistAgent
 from core.agents.chat_agent import ChatAgent
 from core.agents.complete_agent import CompletionAgent
+from core.agents.computer_agent import ComputerAgent
 from core.api.schemas import (
     AgentRunRequest,
     AgentRunStatus,
@@ -46,6 +47,8 @@ from core.api.schemas import (
     AssistResponse,
     ChatRequest,
     ChatResponse,
+    ComputerRunRequest,
+    ComputerRunResult,
     DebugActionRequest,
     DebugBreakpointsRequest,
     DebugEvalRequest,
@@ -128,8 +131,10 @@ orchestrator = Orchestrator(events, approvals, settings, router)
 chat_agent = ChatAgent(router, orchestrator.registry)
 assist_agent = AssistAgent(router)
 completion_agent = CompletionAgent(router)
+computer_agent = ComputerAgent(router, approvals, events)
 db = get_database()
 _running: dict[str, asyncio.Task] = {}
+_computer_runs: dict[str, dict] = {}
 
 
 async def _persist_events() -> None:
@@ -609,6 +614,38 @@ async def git_restore(req: GitRestoreRequest) -> SimpleOk:
         raise HTTPException(400, str(exc)) from exc
     await events.record("report", note=f"restored to {req.target}")
     return SimpleOk(detail=f"restored to {req.target}")
+
+
+# -- computer agent (acts outside the workspace) -------------
+async def _run_computer(run_id: str, instruction: str) -> None:
+    _computer_runs[run_id] = {"id": run_id, "status": "running", "reply": "", "actions": []}
+    try:
+        res = await computer_agent.run(run_id, instruction)
+        _computer_runs[run_id] = {
+            "id": run_id, "status": "passed" if res.succeeded else "failed",
+            "reply": res.reply, "actions": res.actions,
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.exception("computer run %s crashed", run_id)
+        _computer_runs[run_id] = {"id": run_id, "status": "failed", "reply": str(exc), "actions": []}
+
+
+@app.post("/api/computer/run", dependencies=AUTH)
+async def computer_run(req: ComputerRunRequest) -> dict:
+    run_id = f"cmp-{len(_computer_runs) + 1}-{id(req) % 100000}"
+    _running[run_id] = asyncio.create_task(_run_computer(run_id, req.instruction))
+    return {"id": run_id, "status": "running"}
+
+
+@app.get("/api/computer/runs/{run_id}", dependencies=AUTH)
+async def computer_run_status(run_id: str) -> ComputerRunResult:
+    data = _computer_runs.get(run_id)
+    if not data:
+        raise HTTPException(404, "unknown computer run")
+    return ComputerRunResult(
+        id=run_id, status=data.get("status", "running"), reply=data.get("reply", ""),
+        actions=data.get("actions", []), succeeded=data.get("status") == "passed",
+    )
 
 
 # -- agent: chat --------------------------------------------------

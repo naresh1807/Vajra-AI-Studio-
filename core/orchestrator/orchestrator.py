@@ -192,14 +192,15 @@ class Orchestrator:
                     tool=call.tool_name, arguments=call.arguments,
                 )
                 decision = self.registry.check(call, tool_ctx)
+                approved = True
                 if decision.requires_approval:
-                    granted = await self._request_approval(goal_id, task.id, call, decision.reason)
-                    if not granted:
+                    approved = await self._request_approval(goal_id, task.id, call, decision.reason)
+                    if not approved:
                         history.append(agent.tool_result_message(
                             call, agent.dumps({"success": False, "error": "approval rejected"})
                         ))
                         continue
-                result = await self.registry.execute(call, tool_ctx)
+                result = await self.registry.execute(call, tool_ctx, approved=approved)
                 changed.extend(result.changed_files)
                 if call.tool_name == "start_process":
                     test_results.append(bool(result.metadata.get("running")))

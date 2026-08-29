@@ -39,6 +39,8 @@ class ToolAction(BaseModel):
     arguments: dict
     risk_level: RiskLevel
     workspace_root: str | None = None
+    #: computer-agent actions are expected to act outside any workspace
+    outside_workspace_ok: bool = False
 
 
 # Substrings that force CRITICAL regardless of the tool's declared risk.
@@ -74,26 +76,30 @@ class PolicyEngine:
 
         if action.risk_level >= RiskLevel.HIGH:
             return PolicyDecision(
-                allowed=False,
+                allowed=True,
                 requires_approval=True,
                 risk=action.risk_level,
-                reason="High-risk action denied by default; explicit user approval required.",
+                reason="High-risk action: runs only after explicit user approval.",
             )
 
         if action.risk_level == RiskLevel.ELEVATED:
             return PolicyDecision(
-                allowed=self.autonomy_enabled,
+                allowed=True,
                 requires_approval=True,
                 risk=action.risk_level,
-                reason="Elevated action: allowed to propose but requires approval before commit.",
+                reason="Elevated action: requires approval before it runs.",
             )
 
-        if action.risk_level == RiskLevel.MEDIUM and not self._writes_inside_workspace(action):
+        if (
+            action.risk_level == RiskLevel.MEDIUM
+            and not action.outside_workspace_ok
+            and not self._writes_inside_workspace(action)
+        ):
             return PolicyDecision(
-                allowed=False,
+                allowed=True,
                 requires_approval=True,
                 risk=RiskLevel.ELEVATED,
-                reason="Write target is outside the active workspace.",
+                reason="Write target is outside the active workspace; requires approval.",
             )
 
         return PolicyDecision(

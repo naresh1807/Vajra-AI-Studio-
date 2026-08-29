@@ -60,6 +60,8 @@ class Tool(ABC):
     description: str
     risk: RiskLevel = RiskLevel.LOW
     timeout_seconds: int = 60
+    #: computer-agent tools that legitimately act outside any workspace
+    system: bool = False
     #: JSON-schema for arguments (OpenAI function-calling compatible)
     parameters: dict[str, Any] = {"type": "object", "properties": {}}
 

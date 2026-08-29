@@ -97,11 +97,11 @@ class TerminalRunRequest(BaseModel):
 
 class TerminalRunResult(BaseModel):
     stdout: str
-    stderr: str
+    stderr: str = ""
     exit_code: int | None
     duration_ms: int
     cwd: str
-    command: list[str]
+    command: str | list[str]
 
 
 class ProcStartRequest(BaseModel):

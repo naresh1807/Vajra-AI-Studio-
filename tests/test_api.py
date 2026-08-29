@@ -102,6 +102,20 @@ def test_terminal_run(client, tmp_workspace):
     assert body["exit_code"] == 0 and body["stdout"].strip() == "42"
 
 
+def test_terminal_run_uses_a_shell(client, tmp_workspace):
+    """A human-typed command line: shell operators and builtins must work
+    (the argv-only run_command tool could not do this)."""
+    c, token = client
+    r = c.post(
+        "/api/terminal/run",
+        json={"root": str(tmp_workspace), "command": "echo one && echo two"},
+        headers={"X-Vajra-Token": token},
+    )
+    assert r.status_code == 200
+    out = r.json()["stdout"]
+    assert "one" in out and "two" in out
+
+
 def test_proc_list_empty_and_authed(client):
     # ProcessManager lifecycle is covered directly in test_processes.py; here we
     # only check the route is wired and auth-gated (TestClient + Windows Proactor

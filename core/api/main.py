@@ -26,7 +26,6 @@ import asyncio
 import contextlib
 import json
 import logging
-import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -96,9 +95,8 @@ from core.rag import rag_manager
 from core.runtime import format as fmtsvc
 from core.runtime import git as gitsvc
 from core.runtime import process_manager
+from core.runtime import terminal as termsvc
 from core.runtime import testing as testsvc
-from core.tools import ToolContext
-from core.tools.process_tools import RunCommandTool
 from core.workspace import (
     WorkspaceError,
     build_tree,
@@ -498,26 +496,13 @@ async def lsp_definition(req: LspRequest) -> dict:
 # -- terminal -----------------------------------------------------
 @app.post("/api/terminal/run", dependencies=AUTH)
 async def terminal_run(req: TerminalRunRequest) -> TerminalRunResult:
-    ctx = ToolContext(workspace_root=req.root)
-    started = time.perf_counter()
-    result = await RunCommandTool().run(
-        ctx, command=req.command, timeout_seconds=req.timeout_seconds
-    )
-    argv = result.metadata.get("argv") or (
-        req.command if isinstance(req.command, list) else [req.command]
-    )
+    # human-driven: runs through the platform shell (PATHEXT, pipes, &&, builtins).
+    res = await termsvc.run_terminal(req.root, req.command, req.timeout_seconds)
     await db.record_event(
-        {"kind": "terminal.run", "payload": {"argv": argv, "exit_code": result.exit_code}}
+        {"kind": "terminal.run", "payload": {"command": res["command"], "exit_code": res["exit_code"]}}
     )
-    await db.record_terminal_run(req.root, " ".join(str(a) for a in argv), result.exit_code)
-    return TerminalRunResult(
-        stdout=result.stdout,
-        stderr=result.stderr,
-        exit_code=result.exit_code,
-        duration_ms=int((time.perf_counter() - started) * 1000),
-        cwd=req.root,
-        command=argv,
-    )
+    await db.record_terminal_run(req.root, str(res["command"]), res["exit_code"])
+    return TerminalRunResult(**res)
 
 
 # -- debugging (DAP - Python via debugpy) --------------------

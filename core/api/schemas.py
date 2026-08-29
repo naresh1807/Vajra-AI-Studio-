@@ -54,6 +54,16 @@ class AssistResponse(BaseModel):
     diff: str | None = None
 
 
+# -- language server -------------------------------------------------
+class LspRequest(BaseModel):
+    root: str
+    path: str
+    content: str
+    language: str
+    line: int = 0
+    character: int = 0
+
+
 # -- terminal ----------------------------------------------------------
 class TerminalRunRequest(BaseModel):
     root: str

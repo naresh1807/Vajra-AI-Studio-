@@ -190,6 +190,48 @@ export class Api {
     );
   }
 
+  private lsp<T>(kind: string, body: object) {
+    return this.j<T>(`/api/lsp/${kind}`, { method: "POST", headers: this.h(), body: JSON.stringify(body) });
+  }
+  lspSupport() {
+    return this.j<{ languages: Record<string, boolean> }>(`/api/lsp/support`, { headers: this.h(false) }).catch(
+      () => ({ languages: {} }),
+    );
+  }
+  lspDiagnostics(b: { root: string; path: string; content: string; language: string }) {
+    return this.lsp<{ supported: boolean; diagnostics: any[] }>("diagnostics", b);
+  }
+  lspCompletion(b: {
+    root: string;
+    path: string;
+    content: string;
+    language: string;
+    line: number;
+    character: number;
+  }) {
+    return this.lsp<{ items: any[] }>("completion", b);
+  }
+  lspHover(b: {
+    root: string;
+    path: string;
+    content: string;
+    language: string;
+    line: number;
+    character: number;
+  }) {
+    return this.lsp<{ value: string | null }>("hover", b);
+  }
+  lspDefinition(b: {
+    root: string;
+    path: string;
+    content: string;
+    language: string;
+    line: number;
+    character: number;
+  }) {
+    return this.lsp<{ locations: Array<{ path: string; range: any }> }>("definition", b);
+  }
+
   chat(message: string, history: Array<{ role: string; content: string }>, workspaceRoot?: string) {
     return this.j<{ reply: string; tool_calls: Array<{ tool: string; success: boolean }>; model: any }>(
       `/api/agent/chat`,

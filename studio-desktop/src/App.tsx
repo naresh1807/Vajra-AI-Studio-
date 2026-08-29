@@ -249,6 +249,8 @@ export function App() {
             onChange={changeDoc}
             onSave={saveActive}
             onAssist={runAssist}
+            lspCtx={() => (root ? { api, root } : null)}
+            onOpenPath={(p) => openFile(p)}
           />
           <BottomPanel api={api} root={root} events={events} />
         </div>

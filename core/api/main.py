@@ -53,6 +53,7 @@ from core.api.schemas import (
     GitPathsRequest,
     GitRequest,
     GitRestoreRequest,
+    LspRequest,
     OpenProjectRequest,
     ProcStartRequest,
     ProcStopRequest,
@@ -65,6 +66,8 @@ from core.api.schemas import (
 from core.config import get_settings
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
+from core.lsp import lsp_manager
+from core.lsp.config import supported as lsp_supported
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
 from core.runtime import git as gitsvc
@@ -89,6 +92,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         app.state.persist_task.cancel()
         await process_manager.stop_all()
+        await lsp_manager.shutdown_all()
 
 
 app = FastAPI(title="Vajra Core API", version="0.2.0", lifespan=lifespan)
@@ -303,6 +307,53 @@ async def assist(req: AssistRequest) -> AssistResponse:
     return AssistResponse(
         kind=result.kind, text=result.text, new_content=result.new_content, diff=result.diff
     )
+
+
+# -- language server (diagnostics / hover / completion / definition) --
+@app.get("/api/lsp/support", dependencies=AUTH)
+async def lsp_support() -> dict:
+    return {"languages": lsp_supported(), "servers": lsp_manager.status()}
+
+
+@app.post("/api/lsp/diagnostics", dependencies=AUTH)
+async def lsp_diagnostics(req: LspRequest) -> dict:
+    client = await lsp_manager.sync(req.root, req.path, req.content, req.language)
+    if not client:
+        return {"supported": False, "diagnostics": []}
+    for _ in range(8):  # give the server a moment to publish
+        await asyncio.sleep(0.35)
+        diags = client.diagnostics(req.path)
+        if diags:
+            break
+    return {"supported": True, "diagnostics": client.diagnostics(req.path)}
+
+
+@app.post("/api/lsp/completion", dependencies=AUTH)
+async def lsp_completion(req: LspRequest) -> dict:
+    client = await lsp_manager.sync(req.root, req.path, req.content, req.language)
+    if not client:
+        return {"supported": False, "items": []}
+    await asyncio.sleep(0.1)
+    items = await client.completion(req.path, req.line, req.character)
+    return {"supported": True, "items": items[:200]}
+
+
+@app.post("/api/lsp/hover", dependencies=AUTH)
+async def lsp_hover(req: LspRequest) -> dict:
+    client = await lsp_manager.sync(req.root, req.path, req.content, req.language)
+    if not client:
+        return {"supported": False, "value": None}
+    await asyncio.sleep(0.1)
+    return {"supported": True, "value": await client.hover(req.path, req.line, req.character)}
+
+
+@app.post("/api/lsp/definition", dependencies=AUTH)
+async def lsp_definition(req: LspRequest) -> dict:
+    client = await lsp_manager.sync(req.root, req.path, req.content, req.language)
+    if not client:
+        return {"supported": False, "locations": []}
+    await asyncio.sleep(0.1)
+    return {"supported": True, "locations": await client.definition(req.path, req.line, req.character)}
 
 
 # -- terminal -----------------------------------------------------

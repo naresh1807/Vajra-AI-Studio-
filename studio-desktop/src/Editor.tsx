@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { monaco, langFor } from "./monaco";
+import { installLsp, refreshDiagnostics, LspCtx } from "./lsp";
 
 export interface OpenDoc {
   path: string;
@@ -28,6 +29,8 @@ export function EditorArea({
   onChange,
   onSave,
   onAssist,
+  lspCtx,
+  onOpenPath,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -36,6 +39,8 @@ export function EditorArea({
   onChange: (path: string, content: string) => void;
   onSave: () => void;
   onAssist: (action: AssistAction, selection: string | null, instruction?: string) => void;
+  lspCtx: () => LspCtx | null;
+  onOpenPath: (path: string, line: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -43,9 +48,16 @@ export function EditorArea({
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onAssistRef = useRef(onAssist);
+  const lspCtxRef = useRef(lspCtx);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onAssistRef.current = onAssist;
+  lspCtxRef.current = lspCtx;
+
+  useEffect(() => {
+    installLsp(() => lspCtxRef.current(), onOpenPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!host.current) return;
@@ -102,11 +114,18 @@ export function EditorArea({
     }
     const doc = docs.find((d) => d.path === active);
     if (!doc) return;
+    const language = langFor(active);
     let model = models.current.get(active);
     if (!model) {
-      model = monaco.editor.createModel(doc.content, langFor(active));
+      model = monaco.editor.createModel(doc.content, language);
+      (model as any).__vajraPath = active;
       models.current.set(active, model);
-      model.onDidChangeContent(() => onChangeRef.current(active, model!.getValue()));
+      const m = model;
+      m.onDidChangeContent(() => {
+        onChangeRef.current(active, m.getValue());
+        refreshDiagnostics(() => lspCtxRef.current(), m, active, language);
+      });
+      refreshDiagnostics(() => lspCtxRef.current(), model, active, language);
     } else if (model.getValue() !== doc.content && !doc.dirty) {
       model.setValue(doc.content);
     }

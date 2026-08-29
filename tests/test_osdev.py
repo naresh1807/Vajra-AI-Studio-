@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
+from pathlib import Path
 
 import pytest
 
 from core.osdev import providers_available, run_step, scan_serial
 from core.osdev.vm import VmSpec, boot_and_capture, qemu_binary
 from core.tools import ToolCall, ToolContext, build_osdev_registry
+
+_KERNEL_DIR = Path(__file__).resolve().parent.parent / "examples" / "tiny-kernel"
 
 
 def test_providers_available_shape():
@@ -95,3 +99,37 @@ async def test_real_qemu_captures_serial_and_flags_no_boot(tmp_path):
     assert not res.booted
     assert "SeaBIOS" in res.serial  # serial console really was captured
     assert res.panic or res.timed_out  # unbootable disk -> flagged, not a false success
+
+
+def _clang():
+    for c in ("clang", str(Path("C:/Program Files/LLVM/bin/clang.exe"))):
+        if shutil.which(c) or Path(c).is_file():
+            return c
+    return None
+
+
+@pytest.mark.skipif(
+    qemu_binary("i386") is None or _clang() is None or not _KERNEL_DIR.is_dir(),
+    reason="needs qemu-system-i386 + clang + examples/tiny-kernel",
+)
+async def test_build_and_boot_tiny_kernel(tmp_path):
+    cc = _clang()
+    ld = str(Path(cc).with_name("ld.lld.exe")) if cc.endswith(".exe") else "ld.lld"
+    cf = ["--target=i386-unknown-none-elf", "-m32", "-ffreestanding", "-nostdlib", "-fno-pic", "-O2"]
+    for src, obj in (("boot.S", "boot.o"), ("kernel.c", "kernel.o")):
+        r = await run_step(obj, [cc, *cf, "-c", str(_KERNEL_DIR / src), "-o", str(tmp_path / obj)], str(tmp_path))
+        assert r.ok, r.output
+    elf = tmp_path / "kernel.elf"
+    r = await run_step(
+        "link",
+        [ld, "-m", "elf_i386", "-n", "-T", str(_KERNEL_DIR / "linker.ld"),
+         "-o", str(elf), str(tmp_path / "boot.o"), str(tmp_path / "kernel.o")],
+        str(tmp_path),
+    )
+    assert r.ok, r.output
+
+    res = await boot_and_capture(
+        VmSpec(arch="i386", kernel=str(elf), boot_timeout=30, ready_marker="VAJRA-KERNEL-OK")
+    )
+    assert res.booted and res.ready and not res.panic
+    assert res.duration_s < 20  # early-terminates on the ready marker

@@ -144,9 +144,10 @@ async def boot_and_capture(spec: VmSpec) -> BootResult:
 
     chunks: list[bytes] = []
     size = 0
+    settled = ""  # "ready" | "panic" -> stop early instead of waiting the timeout
 
     async def _pump() -> None:
-        nonlocal size
+        nonlocal size, settled
         assert proc.stdout
         while True:
             data = await proc.stdout.read(4096)
@@ -155,6 +156,16 @@ async def boot_and_capture(spec: VmSpec) -> BootResult:
             if size < _MAX_SERIAL:
                 chunks.append(data)
                 size += len(data)
+            if not settled:
+                text = b"".join(chunks).decode("utf-8", "replace")
+                p, r = scan_serial(text, spec.ready_marker)
+                if r:
+                    settled = "ready"
+                elif p:
+                    settled = "panic"
+                if settled:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.terminate()
 
     pump = asyncio.create_task(_pump())
     timed_out = False
@@ -169,6 +180,9 @@ async def boot_and_capture(spec: VmSpec) -> BootResult:
 
     serial = b"".join(chunks).decode("utf-8", "replace")[-_MAX_SERIAL:]
     panic, ready = scan_serial(serial, spec.ready_marker)
+    # early-terminate on a ready marker isn't a timeout
+    if settled == "ready":
+        timed_out = False
     duration = round(time.monotonic() - started, 1)
 
     if spec.ready_marker:

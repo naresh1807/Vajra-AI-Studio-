@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     nvidia_api_key: str | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    vajra_nemotron_model: str = "nvidia/nemotron-4-340b-instruct"
+    vajra_nemotron_model: str = "nvidia/nemotron-3-super-120b-a12b"
 
     vajra_local_model: str = "qwen2.5-coder"
     vajra_local_base_url: str = "http://localhost:11434/v1"

@@ -16,6 +16,26 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 _ENV_PATTERN = re.compile(r"\$\{([A-Z0-9_]+)\}")
 
 
+def _load_dotenv_into_environ(path: Path | None = None) -> None:
+    """Populate os.environ from .env so config-file ${VAR} expansion and
+    api_key_env lookups work, not just the pydantic Settings object.
+    Existing environment variables always win.
+    """
+    env_path = path or REPO_ROOT / ".env"
+    if not env_path.is_file():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+_load_dotenv_into_environ()
+
+
 class Settings(BaseSettings):
     """Runtime settings, loaded from environment / .env."""
 

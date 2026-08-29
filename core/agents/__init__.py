@@ -1,6 +1,7 @@
 from core.agents.assist_agent import AssistAgent, AssistResult
 from core.agents.base import Agent, AgentAction, AgentContext
 from core.agents.chat_agent import ChatAgent, ChatTurn
+from core.agents.complete_agent import CompletionAgent
 from core.agents.specialists import (
     CoderAgent,
     DebuggerAgent,
@@ -19,6 +20,7 @@ __all__ = [
     "ChatAgent",
     "ChatTurn",
     "CoderAgent",
+    "CompletionAgent",
     "DebuggerAgent",
     "PlannerAgent",
     "ReviewerAgent",

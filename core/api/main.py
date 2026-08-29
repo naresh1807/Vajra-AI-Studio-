@@ -36,6 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.agents.assist_agent import AssistAgent
 from core.agents.chat_agent import ChatAgent
+from core.agents.complete_agent import CompletionAgent
 from core.api.schemas import (
     AgentRunRequest,
     AgentRunStatus,
@@ -53,6 +54,7 @@ from core.api.schemas import (
     GitPathsRequest,
     GitRequest,
     GitRestoreRequest,
+    InlineCompleteRequest,
     LspRequest,
     OpenProjectRequest,
     ProcStartRequest,
@@ -117,6 +119,7 @@ router = ModelRouter()
 orchestrator = Orchestrator(events, approvals, settings, router)
 chat_agent = ChatAgent(router, orchestrator.registry)
 assist_agent = AssistAgent(router)
+completion_agent = CompletionAgent(router)
 db = get_database()
 _running: dict[str, asyncio.Task] = {}
 
@@ -329,6 +332,15 @@ async def assist(req: AssistRequest) -> AssistResponse:
     return AssistResponse(
         kind=result.kind, text=result.text, new_content=result.new_content, diff=result.diff
     )
+
+
+# -- inline completion (ghost text) ---------------------------
+@app.post("/api/assist/complete", dependencies=AUTH)
+async def assist_complete(req: InlineCompleteRequest) -> dict:
+    text = await completion_agent.complete(
+        prefix=req.prefix, suffix=req.suffix, language=req.language, path=req.path
+    )
+    return {"text": text}
 
 
 # -- language server (diagnostics / hover / completion / definition) --

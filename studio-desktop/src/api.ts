@@ -6,16 +6,23 @@ export interface Settings {
   apiUrl: string;
   pairingToken: string;
   lastWorkspace: string;
+  inlineCompletions: boolean;
 }
 
 export function loadSettings(): Settings {
+  const base: Settings = {
+    apiUrl: "http://127.0.0.1:8760",
+    pairingToken: "change-me-local-only",
+    lastWorkspace: "",
+    inlineCompletions: false,
+  };
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { lastWorkspace: "", ...(JSON.parse(raw) as Partial<Settings>) } as Settings;
+    if (raw) return { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
   } catch {
     /* ignore */
   }
-  return { apiUrl: "http://127.0.0.1:8760", pairingToken: "change-me-local-only", lastWorkspace: "" };
+  return base;
 }
 
 export function saveSettings(s: Settings): void {
@@ -195,6 +202,14 @@ export class Api {
       `/api/assist`,
       { method: "POST", headers: this.h(), body: JSON.stringify(body) },
     );
+  }
+
+  inlineComplete(b: { root: string; path: string; prefix: string; suffix: string; language: string }) {
+    return this.j<{ text: string }>(`/api/assist/complete`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify(b),
+    }).catch(() => ({ text: "" }));
   }
 
   private lsp<T>(kind: string, body: object) {

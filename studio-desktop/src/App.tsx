@@ -316,6 +316,7 @@ export function App() {
             lspCtx={() => (root ? { api, root } : null)}
             onOpenPath={openFileAt}
             reveal={reveal}
+            inlineEnabled={settings.inlineCompletions}
           />
           <BottomPanel api={api} root={root} events={events} />
         </div>
@@ -401,6 +402,19 @@ function SettingsModal({
         <input value={d.apiUrl} onChange={(e) => setD({ ...d, apiUrl: e.target.value })} />
         <label>Pairing token (matches VAJRA_PAIRING_TOKEN in .env)</label>
         <input value={d.pairingToken} onChange={(e) => setD({ ...d, pairingToken: e.target.value })} />
+        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
+          <input
+            type="checkbox"
+            style={{ width: "auto" }}
+            checked={d.inlineCompletions}
+            onChange={(e) => setD({ ...d, inlineCompletions: e.target.checked })}
+          />
+          AI inline completions — ghost text, Tab to accept
+        </label>
+        <div className="muted small" style={{ marginTop: 4 }}>
+          Best with a fast local coding model (Ollama qwen2.5-coder). Hosted reasoning
+          models are slow for this and suggestions may be sparse.
+        </div>
         <div className="row end">
           <button onClick={onClose}>Cancel</button>
           <button className="primary" onClick={() => onSave(d)}>

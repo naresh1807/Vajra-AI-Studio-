@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { monaco, langFor } from "./monaco";
-import { installLsp, refreshDiagnostics, LspCtx } from "./lsp";
+import { installLsp, installInlineCompletions, refreshDiagnostics, LspCtx } from "./lsp";
 
 export interface OpenDoc {
   path: string;
@@ -32,6 +32,7 @@ export function EditorArea({
   lspCtx,
   onOpenPath,
   reveal,
+  inlineEnabled = true,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -43,6 +44,7 @@ export function EditorArea({
   lspCtx: () => LspCtx | null;
   onOpenPath: (path: string, line: number) => void;
   reveal: { path: string; line: number; n: number } | null;
+  inlineEnabled?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -51,13 +53,16 @@ export function EditorArea({
   const onSaveRef = useRef(onSave);
   const onAssistRef = useRef(onAssist);
   const lspCtxRef = useRef(lspCtx);
+  const inlineEnabledRef = useRef(inlineEnabled);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onAssistRef.current = onAssist;
   lspCtxRef.current = lspCtx;
+  inlineEnabledRef.current = inlineEnabled;
 
   useEffect(() => {
     installLsp(() => lspCtxRef.current(), onOpenPath);
+    installInlineCompletions(() => lspCtxRef.current(), () => inlineEnabledRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -70,6 +75,7 @@ export function EditorArea({
       minimap: { enabled: true },
       scrollBeyondLastLine: false,
       tabSize: 2,
+      inlineSuggest: { enabled: true },
     });
     editor.current = ed;
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());

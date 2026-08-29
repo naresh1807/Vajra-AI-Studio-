@@ -63,6 +63,14 @@ class AssistResponse(BaseModel):
     diff: str | None = None
 
 
+class InlineCompleteRequest(BaseModel):
+    root: str
+    path: str
+    prefix: str
+    suffix: str = ""
+    language: str = ""
+
+
 # -- language server -------------------------------------------------
 class LspRequest(BaseModel):
     root: str

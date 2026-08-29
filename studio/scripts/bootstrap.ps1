@@ -3,14 +3,10 @@
   product.json, and bundles the Vajra extension as a built-in. Run build.ps1
   afterwards to compile the app.
 
-  Prereqs (one-time, admin):
-    winget install Git.Git OpenJS.NodeJS.LTS Python.Python.3.12
-    "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-      --installPath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools" `
-      --add Microsoft.VisualStudio.Workload.VCTools `
-      --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre `
-      --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --quiet
-  (VS Code's native modules require the Spectre-mitigated MSVC libraries.)
+  Prereqs (one-time, admin): git, Node LTS, Python 3.12, VS Build Tools with the
+  "Desktop development with C++" workload + Windows 11 SDK. The Spectre-mitigated
+  MSVC libs are NOT required - this script drops that requirement for the tiny
+  native helper modules via Directory.Build.targets.
   ~10 GB disk, first `npm ci` ~15-20 min.
 
   Usage:  scripts\bootstrap.ps1 [-Tag 1.135.0]
@@ -41,6 +37,10 @@ npm run build
 Pop-Location
 $dest = Join-Path $vscode "extensions\vajra"
 robocopy (Join-Path $repo "vscode-extension") $dest /MIR /XD node_modules src /XF *.vsix tsconfig.json .vscodeignore | Out-Null
+
+# Neutralise the per-native-module Spectre-mitigation requirement (MSB8040) so
+# `npm ci` doesn't need the Spectre-mitigated MSVC libs. See the file's comment.
+Copy-Item (Join-Path $PSScriptRoot "Directory.Build.targets") $vscode -Force
 
 Write-Host "Installing vscode dependencies (this is the long part) ..." -ForegroundColor Cyan
 Push-Location $vscode

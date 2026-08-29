@@ -18,18 +18,10 @@ studio/
 
 ## Build
 
-One-time prereqs (admin) — git, Node LTS, Python 3.12, and VS Build Tools **with
-the Spectre-mitigated MSVC libraries** (VS Code's native modules require them):
-
-```powershell
-"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-  --installPath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools" `
-  --add Microsoft.VisualStudio.Workload.VCTools `
-  --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre `
-  --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --quiet
-```
-
-Then:
+One-time prereqs (admin): **git**, **Node LTS**, **Python 3.12**, and **VS Build
+Tools** with the *Desktop development with C++* workload + a Windows 11 SDK.
+(The Spectre-mitigated MSVC libs are *not* needed — `bootstrap.ps1` drops that
+requirement for the native helper modules via `Directory.Build.targets`.)
 
 ```powershell
 cd studio

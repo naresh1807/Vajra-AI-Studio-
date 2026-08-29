@@ -1,0 +1,12 @@
+<!--
+  Copied into studio/vscode/ by bootstrap.ps1. MSBuild imports Directory.Build.targets
+  after every .vcxproj body, so this neutralises the per-module
+  <SpectreMitigation>Spectre</SpectreMitigation> that otherwise fails with MSB8040
+  unless the Spectre-mitigated MSVC libs are installed. Studio is a local dev
+  build; dropping Spectre hardening on the tiny native helper modules is fine.
+-->
+<Project>
+  <PropertyGroup>
+    <SpectreMitigation>false</SpectreMitigation>
+  </PropertyGroup>
+</Project>

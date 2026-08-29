@@ -117,6 +117,13 @@ def test_agent_chat(client):
     assert r.status_code == 200 and r.json()["reply"] == "stub reply"
 
 
+def test_osdev_providers_route(client):
+    c, token = client
+    assert c.get("/api/osdev/providers").status_code == 401
+    r = c.get("/api/osdev/providers", headers={"X-Vajra-Token": token})
+    assert r.status_code == 200 and "x86_64" in r.json()["qemu"]
+
+
 def test_mobile_page_served_unauthenticated(client):
     c, _ = client
     r = c.get("/mobile")

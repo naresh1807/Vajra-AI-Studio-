@@ -351,6 +351,23 @@ export class Api {
     );
   }
 
+  osdevRun(instruction: string) {
+    return this.j<{ id: string; status: string }>(`/api/osdev/run`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ instruction }),
+    });
+  }
+  osdevRunStatus(id: string) {
+    return this.j<{ id: string; status: string; reply: string; actions: Array<{ tool: string; success: boolean }> }>(
+      `/api/osdev/runs/${id}`,
+      { headers: this.h(false) },
+    );
+  }
+  osdevProviders() {
+    return this.j<{ qemu: Record<string, boolean> }>(`/api/osdev/providers`, { headers: this.h(false) });
+  }
+
   approvals() {
     return this.j<Array<{ id: string; tool_name: string; reason: string }>>(`/api/approvals`, {
       headers: this.h(false),

@@ -145,3 +145,27 @@ def build_computer_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         tool.system = True
         registry.register(tool)
     return registry
+
+
+def build_osdev_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
+    """Registry for the OS-Development Agent - build + boot kernels/ISOs, plus
+    read-only filesystem inspection. All tools act outside any workspace."""
+    from core.tools import computer_tools as ct
+    from core.tools import osdev_tools as ot
+
+    registry = ToolRegistry(policy or PolicyEngine())
+    for tool_cls in (
+        ot.OsDevProvidersTool,
+        ot.OsDevBuildTool,
+        ot.OsDevBootTool,
+        ot.OsDevMakeImageTool,
+        ct.ResolveKnownFolderTool,
+        ct.ListDirTool,
+        ct.FindFilesTool,
+        ct.WriteFileAnywhereTool,
+        ct.CreateFolderTool,
+    ):
+        tool = tool_cls()
+        tool.system = True
+        registry.register(tool)
+    return registry

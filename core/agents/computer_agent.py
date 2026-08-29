@@ -53,17 +53,20 @@ class ComputerAgent:
         self.approvals = approvals
         self.events = events
         self.registry = registry or build_computer_registry()
+        self.system_prompt = _SYSTEM
+        self.kind = "computer"
+        self.max_turns = _MAX_TURNS
 
     async def run(self, run_id: str, instruction: str) -> ComputerResult:
         ctx = ToolContext(workspace_root="", goal_id=run_id)
         history: list[ChatMessage] = [
-            ChatMessage(role="system", content=_SYSTEM),
+            ChatMessage(role="system", content=self.system_prompt),
             ChatMessage(role="user", content=instruction),
         ]
         result = ComputerResult(reply="")
-        await self.events.record("goal.created", goal_id=run_id, goal=instruction, kind_hint="computer")
+        await self.events.record("goal.created", goal_id=run_id, goal=instruction, kind_hint=self.kind)
 
-        for _turn in range(_MAX_TURNS):
+        for _turn in range(self.max_turns):
             resp = await self.router.complete(history, tools=self.registry.specs(), max_tokens=1200)
             result.reply = resp.text.strip() or result.reply
             if not resp.tool_calls:

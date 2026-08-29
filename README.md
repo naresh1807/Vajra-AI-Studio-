@@ -85,7 +85,7 @@ llama.cpp). Swapping providers needs no agent-code changes.
 | 6 | Computer agent | ✅ files/apps/PowerShell outside the workspace, approval-gated |
 | 7 | Android command/control | ✅ `GET /mobile` LAN page + Flutter scaffold |
 | 8 | Multi-language expansion | ✅ manifest-driven packs: +json/html/css/bash bundled, rust/go/clangd via PATH |
-| 9 | OS development agent | ⬜ |
+| 9 | OS development agent | ✅ build → boot kernel/ISO in QEMU, capture serial, iterate |
 | 10 | Authorized security engineering | ⬜ |
 
 Plus: DAP debugging, dev-server management, command palette / quick-open /

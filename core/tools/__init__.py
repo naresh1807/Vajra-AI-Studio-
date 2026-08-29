@@ -3,6 +3,7 @@ from core.tools.registry import (
     ToolRegistry,
     build_computer_registry,
     build_default_registry,
+    build_osdev_registry,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "ToolResult",
     "build_computer_registry",
     "build_default_registry",
+    "build_osdev_registry",
 ]

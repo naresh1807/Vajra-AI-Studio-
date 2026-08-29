@@ -63,6 +63,13 @@ class AssistResponse(BaseModel):
     diff: str | None = None
 
 
+class FormatRequest(BaseModel):
+    root: str
+    path: str
+    content: str
+    language: str
+
+
 class InlineCompleteRequest(BaseModel):
     root: str
     path: str

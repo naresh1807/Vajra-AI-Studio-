@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { monaco, langFor } from "./monaco";
-import { installLsp, installInlineCompletions, refreshDiagnostics, LspCtx } from "./lsp";
+import { installLsp, installInlineCompletions, installFormatters, refreshDiagnostics, LspCtx } from "./lsp";
 
 export interface OpenDoc {
   path: string;
@@ -36,6 +36,7 @@ export function EditorArea({
   breakpoints = [],
   onToggleBreakpoint,
   stoppedLine = null,
+  actionRef,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -51,6 +52,7 @@ export function EditorArea({
   breakpoints?: number[];
   onToggleBreakpoint?: (line: number) => void;
   stoppedLine?: number | null;
+  actionRef?: { current: { format: () => void } | null };
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -72,6 +74,7 @@ export function EditorArea({
   useEffect(() => {
     installLsp(() => lspCtxRef.current(), onOpenPath);
     installInlineCompletions(() => lspCtxRef.current(), () => inlineEnabledRef.current);
+    installFormatters(() => lspCtxRef.current());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,6 +97,11 @@ export function EditorArea({
         onToggleBpRef.current?.(e.target.position.lineNumber);
       }
     });
+    if (actionRef) {
+      actionRef.current = {
+        format: () => ed.getAction("editor.action.formatDocument")?.run(),
+      };
+    }
 
     const selText = () => {
       const sel = ed.getSelection();

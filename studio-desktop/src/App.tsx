@@ -56,6 +56,7 @@ export function App() {
   const [debug, setDebug] = useState<DebugState | null>(null);
   const [debugFrame, setDebugFrame] = useState<{ path: string; line: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const editorApiRef = useRef<{ format: () => void } | null>(null);
 
   const sep = root && root.includes("\\") ? "\\" : "/";
   const abs = (rel: string) => `${root}${sep}${rel.replace(/\//g, sep)}`;
@@ -242,6 +243,12 @@ export function App() {
     () => [
       { id: "openFolder", label: "Open Folder…", run: openFolder },
       { id: "save", label: "Save File", hint: "Ctrl+S", run: () => void saveActive() },
+      {
+        id: "format",
+        label: "Format Document",
+        hint: "Shift+Alt+F",
+        run: () => editorApiRef.current?.format(),
+      },
       { id: "explorer", label: "View: Explorer", run: () => setLeftTab("explorer") },
       { id: "search", label: "View: Search", hint: "Ctrl+Shift+F", run: () => setLeftTab("search") },
       { id: "scm", label: "View: Source Control", run: () => setLeftTab("git") },
@@ -374,6 +381,7 @@ export function App() {
             breakpoints={active ? bps[active] ?? [] : []}
             onToggleBreakpoint={toggleBp}
             stoppedLine={debugFrame && active && debugFrame.path.endsWith(active) ? debugFrame.line : null}
+            actionRef={editorApiRef}
           />
           <BottomPanel
             api={api}

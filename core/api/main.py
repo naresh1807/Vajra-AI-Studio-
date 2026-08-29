@@ -53,6 +53,7 @@ from core.api.schemas import (
     EditorOpenRequest,
     FileReadRequest,
     FileWriteRequest,
+    FormatRequest,
     GitCheckpointRequest,
     GitCommitRequest,
     GitPathsRequest,
@@ -78,6 +79,7 @@ from core.lsp import lsp_manager
 from core.lsp.config import supported as lsp_supported
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
+from core.runtime import format as fmtsvc
 from core.runtime import git as gitsvc
 from core.runtime import process_manager
 from core.tools import ToolContext
@@ -338,6 +340,16 @@ async def assist(req: AssistRequest) -> AssistResponse:
     return AssistResponse(
         kind=result.kind, text=result.text, new_content=result.new_content, diff=result.diff
     )
+
+
+# -- format document ----------------------------------------
+@app.post("/api/format", dependencies=AUTH)
+async def format_doc(req: FormatRequest) -> dict:
+    try:
+        formatted = await fmtsvc.format_document(req.root, req.path, req.content, req.language)
+    except fmtsvc.FormatUnavailable as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"formatted": formatted, "changed": formatted != req.content}
 
 
 # -- inline completion (ghost text) ---------------------------

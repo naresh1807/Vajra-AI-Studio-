@@ -250,6 +250,14 @@ export class Api {
     );
   }
 
+  formatDoc(b: { root: string; path: string; content: string; language: string }) {
+    return this.j<{ formatted: string; changed: boolean }>(`/api/format`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify(b),
+    });
+  }
+
   inlineComplete(b: { root: string; path: string; prefix: string; suffix: string; language: string }) {
     return this.j<{ text: string }>(`/api/assist/complete`, {
       method: "POST",

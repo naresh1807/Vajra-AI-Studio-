@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Api, FileNode, loadSettings, saveSettings, Settings } from "./api";
-import { EditorArea, OpenDoc } from "./Editor";
+import { AssistAction, EditorArea, OpenDoc } from "./Editor";
 import { FileTree } from "./FileTree";
 import { BottomPanel } from "./BottomPanel";
 import { AgentPanel } from "./AgentPanel";
+import { DiffModal } from "./DiffModal";
+import { langFor } from "./monaco";
+
+interface PendingDiff {
+  path: string;
+  original: string;
+  proposed: string;
+  title: string;
+}
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings());
@@ -17,6 +26,9 @@ export function App() {
   const [events, setEvents] = useState<any[]>([]);
   const [showSettings, setShowSettings] = useState(!settings.pairingToken || settings.pairingToken === "change-me-local-only");
   const [toast, setToast] = useState("");
+  const [pendingDiff, setPendingDiff] = useState<PendingDiff | null>(null);
+  const [assisting, setAssisting] = useState(false);
+  const [prose, setProse] = useState<{ title: string; text: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const refreshHealth = useCallback(async () => {
@@ -103,6 +115,56 @@ export function App() {
     }
   }, [docs, active, root, api, loadTree]);
 
+  const runAssist = useCallback(
+    async (action: AssistAction, selection: string | null, instruction?: string) => {
+      const doc = docs.find((d) => d.path === active);
+      if (!doc || !root || assisting) return;
+      setAssisting(true);
+      setToast(`Vajra: ${action}…`);
+      try {
+        const r = await api.assist({
+          root,
+          path: doc.path,
+          action,
+          selection,
+          instruction,
+          language: langFor(doc.path),
+        });
+        if (r.kind === "prose") {
+          setProse({ title: `Vajra — ${action}`, text: r.text });
+        } else if (r.new_content && r.new_content !== doc.content) {
+          setPendingDiff({
+            path: doc.path,
+            original: doc.content,
+            proposed: r.new_content,
+            title: `Vajra — ${action}`,
+          });
+        } else {
+          setToast("No change proposed.");
+        }
+      } catch (e) {
+        setToast(`assist: ${e}`);
+      } finally {
+        setAssisting(false);
+      }
+    },
+    [docs, active, root, api, assisting],
+  );
+
+  async function acceptDiff() {
+    if (!pendingDiff || !root) return;
+    const { path, proposed } = pendingDiff;
+    setPendingDiff(null);
+    try {
+      await api.writeFile(root, path, proposed);
+      setDocs((d) => d.map((x) => (x.path === path ? { ...x, content: proposed, dirty: false } : x)));
+      setToast(`applied to ${path}`);
+      void loadTree(root);
+    } catch (e) {
+      setToast(`apply: ${e}`);
+    }
+  }
+
   function closeDoc(path: string) {
     setDocs((d) => d.filter((x) => x.path !== path));
     if (active === path) {
@@ -142,6 +204,7 @@ export function App() {
             onClose={closeDoc}
             onChange={changeDoc}
             onSave={saveActive}
+            onAssist={runAssist}
           />
           <BottomPanel api={api} root={root} events={events} />
         </div>
@@ -149,6 +212,30 @@ export function App() {
       </div>
 
       {toast && <div className="toast">{toast}</div>}
+
+      {pendingDiff && (
+        <DiffModal
+          path={pendingDiff.path}
+          original={pendingDiff.original}
+          proposed={pendingDiff.proposed}
+          title={pendingDiff.title}
+          onAccept={acceptDiff}
+          onReject={() => setPendingDiff(null)}
+        />
+      )}
+
+      {prose && (
+        <div className="modal-bg" onClick={() => setProse(null)}>
+          <div className="modal prose-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row">
+              <b>{prose.title}</b>
+              <div className="spacer" />
+              <button onClick={() => setProse(null)}>Close</button>
+            </div>
+            <pre className="prose-body">{prose.text}</pre>
+          </div>
+        </div>
+      )}
 
       {showSettings && (
         <SettingsModal

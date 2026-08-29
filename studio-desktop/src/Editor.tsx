@@ -7,6 +7,19 @@ export interface OpenDoc {
   dirty: boolean;
 }
 
+export type AssistAction =
+  | "explain" | "fix" | "refactor" | "optimize" | "tests" | "document" | "security" | "edit";
+
+const MENU: Array<{ id: AssistAction; label: string }> = [
+  { id: "explain", label: "Vajra: Explain" },
+  { id: "fix", label: "Vajra: Fix" },
+  { id: "refactor", label: "Vajra: Refactor" },
+  { id: "optimize", label: "Vajra: Optimize" },
+  { id: "tests", label: "Vajra: Write Tests" },
+  { id: "document", label: "Vajra: Document" },
+  { id: "security", label: "Vajra: Security Review" },
+];
+
 export function EditorArea({
   docs,
   active,
@@ -14,6 +27,7 @@ export function EditorArea({
   onClose,
   onChange,
   onSave,
+  onAssist,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -21,18 +35,21 @@ export function EditorArea({
   onClose: (path: string) => void;
   onChange: (path: string, content: string) => void;
   onSave: () => void;
+  onAssist: (action: AssistAction, selection: string | null, instruction?: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const models = useRef<Map<string, monaco.editor.ITextModel>>(new Map());
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
+  const onAssistRef = useRef(onAssist);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
+  onAssistRef.current = onAssist;
 
   useEffect(() => {
     if (!host.current) return;
-    editor.current = monaco.editor.create(host.current, {
+    const ed = monaco.editor.create(host.current, {
       automaticLayout: true,
       theme: "vs-dark",
       fontSize: 13,
@@ -40,9 +57,37 @@ export function EditorArea({
       scrollBeyondLastLine: false,
       tabSize: 2,
     });
-    editor.current.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());
+    editor.current = ed;
+    ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());
+
+    const selText = () => {
+      const sel = ed.getSelection();
+      return sel && !sel.isEmpty() ? ed.getModel()?.getValueInRange(sel) ?? null : null;
+    };
+
+    for (const item of MENU) {
+      ed.addAction({
+        id: `vajra.${item.id}`,
+        label: item.label,
+        contextMenuGroupId: "vajra",
+        contextMenuOrder: 1,
+        run: () => onAssistRef.current(item.id, selText()),
+      });
+    }
+    ed.addAction({
+      id: "vajra.edit",
+      label: "Vajra: Edit with instruction… (Ctrl+K)",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
+      contextMenuGroupId: "vajra",
+      contextMenuOrder: 0,
+      run: () => {
+        const instruction = window.prompt("Tell Vajra what to change:");
+        if (instruction) onAssistRef.current("edit", selText(), instruction);
+      },
+    });
+
     return () => {
-      editor.current?.dispose();
+      ed.dispose();
       models.current.forEach((m) => m.dispose());
       models.current.clear();
     };

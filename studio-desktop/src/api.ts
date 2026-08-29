@@ -106,6 +106,20 @@ export class Api {
     return this.j<{ diff: string }>(`/api/git/diff?root=${encodeURIComponent(root)}${q}`, { headers: this.h(false) });
   }
 
+  assist(body: {
+    root: string;
+    path: string;
+    action: string;
+    selection?: string | null;
+    instruction?: string | null;
+    language?: string;
+  }) {
+    return this.j<{ kind: "prose" | "edit"; text: string; new_content: string | null; diff: string | null }>(
+      `/api/assist`,
+      { method: "POST", headers: this.h(), body: JSON.stringify(body) },
+    );
+  }
+
   chat(message: string, history: Array<{ role: string; content: string }>, workspaceRoot?: string) {
     return this.j<{ reply: string; tool_calls: Array<{ tool: string; success: boolean }>; model: any }>(
       `/api/agent/chat`,

@@ -34,12 +34,15 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.agents.assist_agent import AssistAgent
 from core.agents.chat_agent import ChatAgent
 from core.api.schemas import (
     AgentRunRequest,
     AgentRunStatus,
     AgentStopRequest,
     ApproveRequest,
+    AssistRequest,
+    AssistResponse,
     ChatRequest,
     ChatResponse,
     EditorOpenRequest,
@@ -93,6 +96,7 @@ approvals = ApprovalGate()
 router = ModelRouter()
 orchestrator = Orchestrator(events, approvals, settings, router)
 chat_agent = ChatAgent(router, orchestrator.registry)
+assist_agent = AssistAgent(router)
 db = get_database()
 _running: dict[str, asyncio.Task] = {}
 
@@ -213,6 +217,29 @@ async def editor_open(req: EditorOpenRequest) -> dict:
         return read_file(req.root, req.path).model_dump()
     except WorkspaceError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+# -- assisted coding ---------------------------------------------
+@app.post("/api/assist", dependencies=AUTH)
+async def assist(req: AssistRequest) -> AssistResponse:
+    """Explain / fix / refactor / optimize / tests / document / security / edit.
+    Edit actions return a *proposed* rewrite + diff; the client applies it via
+    /api/files/write only after the user accepts (manual v3.0 sec 6)."""
+    try:
+        content = read_file(req.root, req.path).content
+    except WorkspaceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    result = await assist_agent.run(
+        action=req.action,  # type: ignore[arg-type]
+        path=req.path,
+        file_content=content,
+        selection=req.selection,
+        instruction=req.instruction,
+        language=req.language,
+    )
+    return AssistResponse(
+        kind=result.kind, text=result.text, new_content=result.new_content, diff=result.diff
+    )
 
 
 # -- terminal -----------------------------------------------------

@@ -37,6 +37,22 @@ class EditorOpenRequest(BaseModel):
     path: str
 
 
+class AssistRequest(BaseModel):
+    root: str
+    path: str
+    action: str  # explain | fix | refactor | optimize | tests | document | security | edit
+    selection: str | None = None
+    instruction: str | None = None
+    language: str = ""
+
+
+class AssistResponse(BaseModel):
+    kind: str  # "prose" | "edit"
+    text: str = ""
+    new_content: str | None = None
+    diff: str | None = None
+
+
 # -- terminal ----------------------------------------------------------
 class TerminalRunRequest(BaseModel):
     root: str

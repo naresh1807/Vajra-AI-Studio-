@@ -1,87 +1,151 @@
-/** Thin client for the Vajra Local API (manual v3.0 route map). Uses the extension host's global fetch. */
+/** Client for the Vajra Local API (manual v3.0). Uses the extension host's global fetch. */
 import * as vscode from "vscode";
 
+export interface Health {
+  status: string;
+  models: Record<string, string>;
+}
 export interface RunStatus {
   id: string;
-  goal: string;
+  goal?: string;
   status: string;
-  progress: Record<string, number>;
-  tasks: Array<Record<string, unknown>>;
+  progress?: Record<string, number>;
+  tasks: Array<{ id: string; title: string; agent: string; state: string }>;
   changed_files: string[];
+}
+export interface Approval {
+  id: string;
+  tool_name: string;
+  reason: string;
+  arguments?: Record<string, unknown>;
+}
+export interface AssistResult {
+  kind: string;
+  text: string;
+  new_content: string | null;
+  diff: string | null;
+}
+export interface RagHit {
+  ref: string;
+  path: string;
+  start_line: number;
+  end_line: number;
+  score: number;
+  text: string;
+}
+export interface RunRef {
+  id: string;
+  status: string;
+  reply?: string;
+  actions?: Array<{ tool: string; success: boolean }>;
 }
 
 export class VajraClient {
-  private base(): string {
-    return vscode.workspace.getConfiguration("vajra").get<string>("apiUrl", "http://127.0.0.1:8760");
+  private cfg() {
+    return vscode.workspace.getConfiguration("vajra");
+  }
+  base(): string {
+    return this.cfg().get<string>("apiUrl", "http://127.0.0.1:8760").replace(/\/$/, "");
   }
   private token(): string {
-    return vscode.workspace.getConfiguration("vajra").get<string>("pairingToken", "");
+    return this.cfg().get<string>("pairingToken", "");
   }
-  private headers(): Record<string, string> {
+  private h(): Record<string, string> {
     return { "Content-Type": "application/json", "X-Vajra-Token": this.token() };
   }
-
-  async health(): Promise<{ status: string; models: Record<string, string> }> {
-    const r = await fetch(`${this.base()}/api/health`);
-    if (!r.ok) throw new Error(`Core not reachable (${r.status})`);
-    return r.json() as Promise<{ status: string; models: Record<string, string> }>;
+  private async j<T>(path: string, init?: RequestInit): Promise<T> {
+    const r = await fetch(`${this.base()}${path}`, { headers: this.h(), ...init });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return (await r.json()) as T;
   }
 
-  async chat(message: string): Promise<string> {
-    const r = await fetch(`${this.base()}/api/agent/chat`, {
-      method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ message }),
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return ((await r.json()) as { reply: string }).reply;
-  }
+  health = () => this.j<Health>("/api/health", { headers: {} });
+  ping = () => this.j<{ detail: string }>("/api/ping");
 
-  async openProject(rootPath: string): Promise<{ id: string }> {
-    const r = await fetch(`${this.base()}/api/projects`, {
+  openProject = (rootPath: string) =>
+    this.j<{ id: string }>("/api/projects", {
       method: "POST",
-      headers: this.headers(),
       body: JSON.stringify({ root_path: rootPath }),
     });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json() as Promise<{ id: string }>;
-  }
 
-  async startRun(goal: string, workspaceRoot: string): Promise<RunStatus> {
-    const r = await fetch(`${this.base()}/api/agent/run`, {
+  chat = (message: string, history: Array<{ role: string; content: string }> = [], root?: string) =>
+    this.j<{ reply: string; tool_calls: Array<{ tool: string; success: boolean }> }>("/api/agent/chat", {
       method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ goal, workspace_root: workspaceRoot, autostart: true }),
+      body: JSON.stringify({ message, history, workspace_root: root }),
     });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json() as Promise<RunStatus>;
-  }
 
-  async runStatus(runId: string): Promise<RunStatus> {
-    const r = await fetch(`${this.base()}/api/agent/runs/${runId}`, { headers: this.headers() });
-    if (!r.ok) throw new Error(await r.text());
-    return r.json() as Promise<RunStatus>;
-  }
-
-  async stopRun(runId: string): Promise<void> {
-    await fetch(`${this.base()}/api/agent/stop`, {
+  startRun = (goal: string, root: string) =>
+    this.j<RunStatus>("/api/agent/run", {
       method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ run_id: runId }),
+      body: JSON.stringify({ goal, workspace_root: root, autostart: true }),
     });
-  }
+  runStatus = (id: string) => this.j<RunStatus>(`/api/agent/runs/${id}`);
+  stopRun = (id: string) =>
+    this.j<unknown>("/api/agent/stop", { method: "POST", body: JSON.stringify({ run_id: id }) });
 
-  async listApprovals(): Promise<Array<{ id: string; tool_name: string; reason: string }>> {
-    const r = await fetch(`${this.base()}/api/approvals`, { headers: this.headers() });
-    if (!r.ok) return [];
-    return r.json() as Promise<Array<{ id: string; tool_name: string; reason: string }>>;
-  }
-
-  async resolveApproval(approvalId: string, verdict: "approved" | "rejected"): Promise<void> {
-    await fetch(`${this.base()}/api/approvals`, {
+  approvals = () => this.j<Approval[]>("/api/approvals").catch(() => [] as Approval[]);
+  resolveApproval = (id: string, verdict: "approved" | "rejected") =>
+    this.j<unknown>("/api/approvals", {
       method: "POST",
-      headers: this.headers(),
-      body: JSON.stringify({ approval_id: approvalId, verdict }),
+      body: JSON.stringify({ approval_id: id, verdict }),
     });
-  }
+
+  assist = (root: string, path: string, content: string, action: string, selection: string, instruction?: string) =>
+    this.j<AssistResult>("/api/assist", {
+      method: "POST",
+      body: JSON.stringify({ root, path, content, action, selection, instruction }),
+    });
+
+  complete = (root: string, path: string, prefix: string, suffix: string, language: string) =>
+    this.j<{ text: string }>("/api/assist/complete", {
+      method: "POST",
+      body: JSON.stringify({ root, path, prefix, suffix, language }),
+    });
+
+  ragReindex = (root: string) =>
+    this.j<{ files: number; chunks: number; embedder: string }>("/api/rag/reindex", {
+      method: "POST",
+      body: JSON.stringify({ root }),
+    });
+  ragSearch = (root: string, query: string, k = 12) =>
+    this.j<{ hits: RagHit[] }>("/api/rag/search", {
+      method: "POST",
+      body: JSON.stringify({ root, query, k }),
+    });
+
+  testDiscover = (root: string) =>
+    this.j<{ framework: string; tests: string[] }>("/api/testing/discover", {
+      method: "POST",
+      body: JSON.stringify({ root }),
+    });
+  testRun = (root: string, nodeIds?: string[]) =>
+    this.j<{
+      framework: string;
+      ok: boolean;
+      cases: Array<{ id: string; outcome: string }>;
+      totals: Record<string, number>;
+      output: string;
+    }>("/api/testing/run", { method: "POST", body: JSON.stringify({ root, node_ids: nodeIds ?? [] }) });
+
+  gitStatus = (root: string) =>
+    this.j<{ branch: string; files: Array<{ path: string; status: string; staged: boolean }> }>(
+      `/api/git/status?root=${encodeURIComponent(root)}`,
+    );
+  gitCheckpoint = (root: string, label: string) =>
+    this.j<unknown>("/api/git/checkpoint", { method: "POST", body: JSON.stringify({ root, label }) });
+
+  computerRun = (instruction: string) =>
+    this.j<{ id: string }>("/api/computer/run", { method: "POST", body: JSON.stringify({ instruction }) });
+  computerRunStatus = (id: string) => this.j<RunRef>(`/api/computer/runs/${id}`);
+
+  osdevRun = (instruction: string) =>
+    this.j<{ id: string }>("/api/osdev/run", { method: "POST", body: JSON.stringify({ instruction }) });
+  osdevRunStatus = (id: string) => this.j<RunRef>(`/api/osdev/runs/${id}`);
+
+  securityRun = (instruction: string, root: string) =>
+    this.j<{ id: string }>("/api/security/run", {
+      method: "POST",
+      body: JSON.stringify({ instruction, root }),
+    });
+  securityRunStatus = (id: string) => this.j<RunRef>(`/api/security/runs/${id}`);
 }

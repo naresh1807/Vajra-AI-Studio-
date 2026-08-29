@@ -1,30 +1,62 @@
 {
   "name": "vajra-ai",
   "displayName": "Vajra AI",
-  "description": "Vajra AI coordinator - chat, autonomous tasks, and workspace review powered by your local Vajra Core.",
-  "version": "0.1.0",
+  "description": "Vajra AI - chat, assisted edits, autonomous tasks, computer/OS/security agents, and a test explorer, powered by your local Vajra Core.",
+  "version": "0.3.0",
   "publisher": "vajra",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other", "Machine Learning"],
-  "activationEvents": [],
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Programming Languages", "Machine Learning", "Testing", "Other"],
+  "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
+  "icon": "media/icon.png",
   "contributes": {
     "commands": [
+      { "command": "vajra.openPanel", "title": "Vajra: Open Panel", "icon": "$(sparkle)" },
       { "command": "vajra.ask", "title": "Vajra: Ask" },
       { "command": "vajra.autonomousTask", "title": "Vajra: Autonomous Task" },
-      { "command": "vajra.runTests", "title": "Vajra: Run Tests" },
-      { "command": "vajra.reviewWorkspace", "title": "Vajra: Review Workspace" },
-      { "command": "vajra.openPanel", "title": "Vajra: Open Panel" }
+      { "command": "vajra.runTests", "title": "Vajra: Run Tests (agent)" },
+      { "command": "vajra.reviewWorkspace", "title": "Vajra: Review Working Tree" },
+      { "command": "vajra.semanticSearch", "title": "Vajra: Semantic Search" },
+      { "command": "vajra.checkpoint", "title": "Vajra: Create Checkpoint" },
+      { "command": "vajra.reindex", "title": "Vajra: Rebuild Semantic Index" },
+      { "command": "vajra.discoverTests", "title": "Vajra: Discover Tests" },
+      { "command": "vajra.assist.edit", "title": "Vajra: Edit with instruction… (Ctrl+K)" },
+      { "command": "vajra.assist.explain", "title": "Vajra: Explain" },
+      { "command": "vajra.assist.fix", "title": "Vajra: Fix" },
+      { "command": "vajra.assist.refactor", "title": "Vajra: Refactor" },
+      { "command": "vajra.assist.optimize", "title": "Vajra: Optimize" },
+      { "command": "vajra.assist.tests", "title": "Vajra: Write Tests" },
+      { "command": "vajra.assist.document", "title": "Vajra: Document" },
+      { "command": "vajra.assist.security", "title": "Vajra: Security Review" }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        { "id": "vajra", "title": "Vajra AI", "icon": "media/icon.svg" }
+    "menus": {
+      "editor/context": [
+        { "submenu": "vajra.assist", "group": "1_modification@99", "when": "editorTextFocus" }
+      ],
+      "vajra.assist": [
+        { "command": "vajra.assist.edit", "group": "1@0" },
+        { "command": "vajra.assist.explain", "group": "2@0" },
+        { "command": "vajra.assist.fix", "group": "2@1" },
+        { "command": "vajra.assist.refactor", "group": "2@2" },
+        { "command": "vajra.assist.optimize", "group": "2@3" },
+        { "command": "vajra.assist.tests", "group": "2@4" },
+        { "command": "vajra.assist.document", "group": "2@5" },
+        { "command": "vajra.assist.security", "group": "2@6" }
+      ],
+      "view/title": [
+        { "command": "vajra.semanticSearch", "when": "view == vajra.chat", "group": "navigation" }
       ]
     },
+    "submenus": [{ "id": "vajra.assist", "label": "Vajra" }],
+    "keybindings": [
+      { "command": "vajra.assist.edit", "key": "ctrl+k", "when": "editorTextFocus" },
+      { "command": "vajra.openPanel", "key": "ctrl+alt+v" }
+    ],
+    "viewsContainers": {
+      "activitybar": [{ "id": "vajra", "title": "Vajra AI", "icon": "media/icon.svg" }]
+    },
     "views": {
-      "vajra": [
-        { "id": "vajra.chat", "name": "Vajra", "type": "webview" }
-      ]
+      "vajra": [{ "id": "vajra.chat", "name": "Vajra", "type": "webview" }]
     },
     "configuration": {
       "title": "Vajra AI",
@@ -38,21 +70,26 @@
           "type": "string",
           "default": "change-me-local-only",
           "description": "Pairing token shared with your local Vajra Core (matches VAJRA_PAIRING_TOKEN)."
+        },
+        "vajra.inlineCompletions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Inline completions from the Core. Only useful with a fast local coding model; the hosted Nemotron is a reasoning model and too slow for keystroke latency."
         }
       }
     }
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
-    "watch": "npm run build -- --watch",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18",
+    "watch": "npm run build -- --watch --sourcemap",
     "package": "vsce package -o vajra-ai.vsix",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^2.24.0",
     "esbuild": "^0.20.0",
-    "typescript": "^5.4.0",
-    "@vscode/vsce": "^2.24.0"
+    "typescript": "^5.4.0"
   }
 }

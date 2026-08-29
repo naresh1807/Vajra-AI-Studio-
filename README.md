@@ -13,11 +13,12 @@ high-level goal and let it plan → edit → save → run → test → debug →
 
 | Path | What |
 |------|------|
-| `core/` | Vajra Core — `api/` (FastAPI + WS), `orchestrator/`, `agents/`, `llm/` (model router), `tools/`, `policy/`, `memory/`, `workspace/`, `events/` |
+| `core/` | Vajra Core — `api/` (FastAPI + WS), `orchestrator/`, `agents/`, `llm/`, `rag/`, `tools/`, `policy/`, `memory/`, `workspace/`, `osdev/`, `security/`, `events/` |
 | `database/` | SQLite store + repositories (Postgres-swappable) |
-| `studio-desktop/` | **Vajra AI Studio** — Tauri + React + Monaco IDE (`src/`, `src-tauri/`) |
-| `mobile-android/flutter_app/` | Vajra Mobile companion (placeholder — Phase 0/7) |
-| `vscode-extension/` | Optional VS Code Coordinator extension |
+| `studio/` | **Vajra AI Studio** — Code-OSS fork that bundles the Vajra extension (primary desktop IDE) |
+| `vscode-extension/` | The Vajra extension — panel, assisted edits, test explorer, semantic search (built-in for `studio/`, also usable in stock VS Code) |
+| `studio-desktop/` | Earlier Tauri + React + Monaco shell (kept as a lightweight alternative) |
+| `mobile-android/flutter_app/` | Vajra Mobile — native Android companion (`scripts/build-apk.ps1`) |
 | `extensions/` | Language/tool packs — LSP servers, DAP adapters, formatters, linters, templates |
 | `config/models.yaml` | Model routing config (Nemotron/NIM primary, local fallback) |
 | `tests/` | pytest suite |

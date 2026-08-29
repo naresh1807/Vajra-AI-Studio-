@@ -1,60 +1,40 @@
 import * as vscode from "vscode";
 import { VajraClient } from "./client";
-import { VajraPanel } from "./panel";
+import { VajraChatView } from "./chatView";
+import { registerAssist } from "./assist";
+import { registerCompletions } from "./completions";
+import { registerTests } from "./tests";
+import { registerMisc } from "./misc";
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(ctx: vscode.ExtensionContext): void {
   const client = new VajraClient();
-  const panel = new VajraPanel(client, context);
+  const view = new VajraChatView(client);
 
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(VajraPanel.viewId, panel, {
+  ctx.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(VajraChatView.viewId, view, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-  );
-
-  const reveal = () => vscode.commands.executeCommand("vajra.chat.focus");
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand("vajra.openPanel", reveal),
-
+    vscode.commands.registerCommand("vajra.openPanel", () => view.reveal()),
     vscode.commands.registerCommand("vajra.ask", async () => {
       const q = await vscode.window.showInputBox({ prompt: "Ask Vajra" });
-      if (!q) return;
-      await reveal();
-      try {
-        const reply = await client.chat(q);
-        void vscode.window.showInformationMessage(reply.slice(0, 300));
-      } catch (e) {
-        void vscode.window.showErrorMessage(String(e));
-      }
+      if (q) void view.ask(q);
     }),
-
     vscode.commands.registerCommand("vajra.autonomousTask", async () => {
-      const goal = await vscode.window.showInputBox({
-        prompt: "Describe the autonomous task (Vajra will plan → build → test → review)",
-      });
-      if (!goal) return;
-      await reveal();
-      await panel.startAutonomous(goal);
+      const g = await vscode.window.showInputBox({ prompt: "Autonomous task (plan → build → test → review)" });
+      if (g) void view.startAgent(g);
     }),
-
-    vscode.commands.registerCommand("vajra.runTests", async () => {
-      await reveal();
-      await panel.startAutonomous("Run the test suite and report pass/fail with failing output.");
-    }),
-
-    vscode.commands.registerCommand("vajra.reviewWorkspace", async () => {
-      await reveal();
-      await panel.startAutonomous(
-        "Review the current working-tree diff for correctness, maintainability and regression risk.",
-      );
-    }),
+    vscode.commands.registerCommand("vajra.runTests", () =>
+      view.startAgent("Run the test suite and report pass/fail with any failing output."),
+    ),
+    vscode.commands.registerCommand("vajra.reviewWorkspace", () =>
+      view.startAgent("Review the current working-tree diff for correctness, maintainability and regression risk."),
+    ),
   );
 
-  client
-    .health()
-    .then((h) => vscode.window.setStatusBarMessage(`Vajra Core ● ${h.status}`, 4000))
-    .catch(() => vscode.window.setStatusBarMessage("Vajra Core offline", 4000));
+  registerAssist(ctx, client);
+  registerCompletions(ctx, client);
+  registerTests(ctx, client);
+  registerMisc(ctx, client);
 }
 
 export function deactivate(): void {}

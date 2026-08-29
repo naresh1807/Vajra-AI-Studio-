@@ -1,0 +1,25 @@
+{
+  "nameShort": "Vajra AI Studio",
+  "nameLong": "Vajra AI Studio",
+  "applicationName": "vajra-studio",
+  "dataFolderName": ".vajra-studio",
+  "win32MutexName": "vajraaistudio",
+  "win32DirName": "Vajra AI Studio",
+  "win32NameVersion": "Vajra AI Studio",
+  "win32RegValueName": "VajraAIStudio",
+  "win32AppId": "{{C7E9A1B4-2F5D-4E8A-9C3B-1A2B3C4D5E6F}}",
+  "win32AppUserModelId": "Vajra.AIStudio",
+  "win32ShellNameShort": "Vajra AI Studio",
+  "darwinBundleIdentifier": "ai.vajra.studio",
+  "linuxIconName": "vajra-ai-studio",
+  "reportIssueUrl": "https://github.com/vajra-ai/studio/issues/new",
+  "urlProtocol": "vajra-studio",
+  "quality": "stable",
+  "enableTelemetry": false,
+  "enableCrashReporter": false,
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item"
+  },
+  "builtInExtensions": []
+}

@@ -34,9 +34,16 @@ requirement for the native helper modules via `Directory.Build.targets`.)
 ```powershell
 cd studio
 scripts\bootstrap.ps1 -Tag 1.135.0     # clone + rebrand + bundle extension + npm ci  (~20 min)
-scripts\build.ps1                      # gulp compile  (~25-45 min)
+scripts\build.ps1                      # gulp compile -> VajraAIStudio-win32-x64\  (~25-45 min)
+scripts\build.ps1 -Setup               # ...also VajraAIStudioSetup-x64.exe (Inno installer)
+scripts\build.ps1 -SkipCompile -Setup  # installer only, from an existing compile
 .\VajraAIStudio-win32-x64\"Vajra AI Studio.exe"
 ```
+
+The **Core** (the Python `vajra-api`) is started automatically by the bundled
+extension when Studio opens (`vajra.autoStartCore`, on by default). Install it
+once — `pip install -e ".[dev]"` in the Vajra repo — or point `vajra.coreCommand`
+at your own launcher.
 
 **Gotcha:** if `ELECTRON_RUN_AS_NODE` is set in your shell, the `.exe` runs as
 plain Node and rejects every flag (`bad option: --user-data-dir`). `Remove-Item

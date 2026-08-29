@@ -1,12 +1,21 @@
 <!--
   Copied into studio/vscode/ by bootstrap.ps1. MSBuild imports Directory.Build.targets
-  after every .vcxproj body, so this neutralises the per-module
-  <SpectreMitigation>Spectre</SpectreMitigation> that otherwise fails with MSB8040
-  unless the Spectre-mitigated MSVC libs are installed. Studio is a local dev
-  build; dropping Spectre hardening on the tiny native helper modules is fine.
+  after every .vcxproj body.
+
+  1. Neutralise the per-module <SpectreMitigation>Spectre</SpectreMitigation> that
+     fails with MSB8040 unless the (optional) Spectre-mitigated MSVC libs are
+     installed. This is a local dev build - fine to drop.
+  2. node-gyp's generated projects don't inherit %LIB% from the VS dev environment,
+     so add it to the linker search path (delayimp.lib etc. -> LNK1181 otherwise).
+     bootstrap.ps1 runs `npm ci` inside vcvars64, so $(LIB) is populated.
 -->
 <Project>
   <PropertyGroup>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(LIB)' != ''">
+    <Link>
+      <AdditionalLibraryDirectories>$(LIB);%(Link.AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
 </Project>

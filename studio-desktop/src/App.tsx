@@ -395,6 +395,7 @@ export function App() {
               setDebugFrame({ path: p, line });
               setReveal({ path: rel, line, n: Date.now() });
             }}
+            onOpenAt={openFileAt}
           />
         </div>
         <AgentPanel api={api} root={root} onFilesChanged={() => root && loadTree(root)} />

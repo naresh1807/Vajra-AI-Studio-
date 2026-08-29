@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { Api, DebugState } from "./api";
 import { DebugPanel } from "./DebugPanel";
+import { monaco } from "./monaco";
 
-type Tab = "terminal" | "output" | "services" | "debug";
+type Tab = "problems" | "terminal" | "output" | "services" | "debug";
+
+interface Problem {
+  path: string;
+  line: number;
+  column: number;
+  severity: number;
+  message: string;
+}
 
 export function BottomPanel({
   api,
@@ -11,6 +20,7 @@ export function BottomPanel({
   debug,
   setDebug,
   onDebugFrame,
+  onOpenAt,
 }: {
   api: Api;
   root: string | null;
@@ -18,8 +28,36 @@ export function BottomPanel({
   debug: DebugState | null;
   setDebug: (s: DebugState | null) => void;
   onDebugFrame: (path: string, line: number) => void;
+  onOpenAt: (path: string, line: number) => void;
 }) {
   const [tab, setTab] = useState<Tab>("terminal");
+  const [problems, setProblems] = useState<Problem[]>([]);
+
+  useEffect(() => {
+    const collect = () => {
+      const markers = monaco.editor.getModelMarkers({ owner: "vajra-lsp" });
+      setProblems(
+        markers
+          .map((m) => {
+            const model = monaco.editor.getModels().find((x) => x.uri.toString() === m.resource.toString());
+            const path = (model as any)?.__vajraPath as string | undefined;
+            return path
+              ? {
+                  path,
+                  line: m.startLineNumber,
+                  column: m.startColumn,
+                  severity: m.severity,
+                  message: m.message,
+                }
+              : null;
+          })
+          .filter(Boolean) as Problem[],
+      );
+    };
+    collect();
+    const sub = monaco.editor.onDidChangeMarkers(collect);
+    return () => sub.dispose();
+  }, []);
 
   useEffect(() => {
     if (debug) setTab("debug");
@@ -82,6 +120,9 @@ export function BottomPanel({
   return (
     <div className="bottom">
       <div className="bottom-tabs">
+        <button className={tab === "problems" ? "active" : ""} onClick={() => setTab("problems")}>
+          Problems {problems.length ? `(${problems.length})` : ""}
+        </button>
         <button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}>
           Terminal
         </button>
@@ -98,6 +139,23 @@ export function BottomPanel({
 
       {tab === "debug" && (
         <DebugPanel api={api} state={debug} setState={setDebug} onFrame={onDebugFrame} />
+      )}
+
+      {tab === "problems" && (
+        <div className="problems">
+          {problems.length === 0 && <div className="muted pad">No problems detected.</div>}
+          {problems
+            .sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line)
+            .map((p, i) => (
+              <div key={i} className="prob-row" onClick={() => onOpenAt(p.path, p.line)}>
+                <span className={`prob-sev s${p.severity}`}>
+                  {p.severity === 8 ? "✕" : p.severity === 4 ? "▲" : "ⓘ"}
+                </span>
+                <span className="prob-msg">{p.message}</span>
+                <span className="muted">{p.path.split("/").pop()}:{p.line}</span>
+              </div>
+            ))}
+        </div>
       )}
 
       {tab === "terminal" && (

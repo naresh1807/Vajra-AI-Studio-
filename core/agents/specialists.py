@@ -135,6 +135,16 @@ class ReviewerAgent(Agent):
     allowed_tools = ("git_diff", "git_status", "read_file")
 
 
+class GitAgent(Agent):
+    name = "git"
+    system_prompt = (
+        "You are Vajra's Git Agent. Create checkpoints and commits for Vajra-owned changes. "
+        "Use git_checkpoint with a short label to commit and tag the current state. Never touch "
+        "unrelated user changes."
+    )
+    allowed_tools = ("git_status", "git_diff", "git_checkpoint", "git_restore")
+
+
 def build_agent_team(router: ModelRouter, registry: ToolRegistry) -> dict[str, Agent]:
     return {
         a.name: a
@@ -144,5 +154,6 @@ def build_agent_team(router: ModelRouter, registry: ToolRegistry) -> dict[str, A
             TesterAgent(router, registry),
             DebuggerAgent(router, registry),
             ReviewerAgent(router, registry),
+            GitAgent(router, registry),
         )
     }

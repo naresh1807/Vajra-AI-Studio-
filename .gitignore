@@ -33,3 +33,6 @@ target/
 .DS_Store
 Thumbs.db
 .idea/
+
+# sandbox (local scratch projects for testing Vajra)
+sandbox/

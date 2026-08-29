@@ -41,6 +41,9 @@ class TaskGraph(BaseModel):
     goal: str
     tasks: list[Task] = []
     max_retries: int = 2
+    debug_rounds: int = 0
+
+    _SATISFIED = (TaskState.PASSED, TaskState.SKIPPED)
 
     def by_id(self, task_id: str) -> Task | None:
         return next((t for t in self.tasks if t.id == task_id), None)
@@ -50,7 +53,7 @@ class TaskGraph(BaseModel):
             if task.state != TaskState.PENDING:
                 continue
             deps = [self.by_id(d) for d in task.depends_on]
-            if all(d and d.state == TaskState.PASSED for d in deps):
+            if all(d and d.state in self._SATISFIED for d in deps):
                 task.state = TaskState.READY
             elif any(d and d.state in (TaskState.FAILED, TaskState.BLOCKED) for d in deps):
                 task.state = TaskState.BLOCKED
@@ -67,13 +70,15 @@ class TaskGraph(BaseModel):
         task.state = TaskState.PASSED
         task.result_summary = summary
 
-    def mark_failed(self, task: Task, error: str) -> Literal["retry", "replan", "blocked"]:
+    def mark_failed(self, task: Task, error: str) -> Literal["retry", "blocked"]:
+        """Failure here means an infrastructure/agent failure, not a red test.
+        Retry the same task up to the budget, then block it (and its dependents)."""
         task.last_error = error
         if task.attempts <= self.max_retries:
             task.state = TaskState.READY
             return "retry"
         task.state = TaskState.FAILED
-        return "replan" if task.attempts <= self.max_retries + 2 else "blocked"
+        return "blocked"
 
     @property
     def complete(self) -> bool:

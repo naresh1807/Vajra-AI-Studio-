@@ -61,6 +61,20 @@ export class Api {
     return this.j<{ status: string; version: string; models: Record<string, string> }>(`/api/health`);
   }
 
+  fsList(path: string) {
+    return this.j<{ path: string; parent: string | null; entries: Array<{ name: string; path: string }> }>(
+      `/api/fs/list?path=${encodeURIComponent(path)}`,
+      { headers: this.h(false) },
+    );
+  }
+  fsMkdir(path: string) {
+    return this.j<{ path: string }>(`/api/fs/mkdir`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root_path: path }),
+    });
+  }
+
   openProject(rootPath: string, create = false) {
     return this.j<{ id: string; name: string; root_path: string; profile: any }>(`/api/projects`, {
       method: "POST",

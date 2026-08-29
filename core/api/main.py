@@ -184,6 +184,51 @@ async def project_context(project_id: str) -> dict:
     return {"project": project, "profile": json.loads(project.get("profile_json") or "{}")}
 
 
+# -- filesystem picker (directory browsing for "Open Folder") --------
+@app.get("/api/fs/list", dependencies=AUTH)
+async def fs_list(path: str = "") -> dict:
+    """List sub-directories of `path` so a client can render a folder picker.
+    Read-only, directories only, no file contents. Empty path -> drive roots
+    (Windows) or filesystem root."""
+    import os as _os
+    import string as _string
+
+    if not path:
+        if _os.name == "nt":
+            drives = [f"{d}:\\" for d in _string.ascii_uppercase if Path(f"{d}:\\").exists()]
+            return {"path": "", "parent": None, "entries": [{"name": d, "path": d} for d in drives]}
+        path = "/"
+
+    base = Path(path).expanduser()
+    if not base.is_dir():
+        raise HTTPException(400, f"not a directory: {base}")
+    base = base.resolve()
+    entries = []
+    try:
+        for e in sorted(_os.scandir(base), key=lambda x: x.name.lower()):
+            if e.name.startswith(".") or e.name in {"$RECYCLE.BIN", "System Volume Information"}:
+                continue
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    entries.append({"name": e.name, "path": str(Path(e.path).resolve())})
+            except OSError:
+                continue
+    except PermissionError as exc:
+        raise HTTPException(403, f"permission denied: {base}") from exc
+    parent = None if base.parent == base else str(base.parent)
+    return {"path": str(base), "parent": parent, "entries": entries}
+
+
+@app.post("/api/fs/mkdir", dependencies=AUTH)
+async def fs_mkdir(req: OpenProjectRequest) -> dict:
+    target = Path(req.root_path).expanduser()
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise HTTPException(400, f"cannot create: {exc}") from exc
+    return {"path": str(target.resolve())}
+
+
 # -- workspace / files ---------------------------------------------
 @app.get("/api/workspace/tree", dependencies=AUTH)
 async def workspace_tree(root: str, max_depth: int = 6) -> dict:

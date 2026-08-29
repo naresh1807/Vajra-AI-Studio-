@@ -5,7 +5,15 @@ import { FileTree } from "./FileTree";
 import { BottomPanel } from "./BottomPanel";
 import { AgentPanel } from "./AgentPanel";
 import { DiffModal } from "./DiffModal";
+import { FolderPicker } from "./FolderPicker";
 import { langFor } from "./monaco";
+
+async function tauriPickFolder(): Promise<string | null> {
+  const t = (window as any).__TAURI__;
+  if (!t?.dialog?.open) return null;
+  const picked = await t.dialog.open({ directory: true, multiple: false });
+  return typeof picked === "string" ? picked : null;
+}
 
 interface PendingDiff {
   path: string;
@@ -29,6 +37,7 @@ export function App() {
   const [pendingDiff, setPendingDiff] = useState<PendingDiff | null>(null);
   const [assisting, setAssisting] = useState(false);
   const [prose, setProse] = useState<{ title: string; text: string } | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const refreshHealth = useCallback(async () => {
@@ -71,31 +80,37 @@ export function App() {
     if (root) void loadTree(root);
   }, [root, loadTree]);
 
-  async function openFolder() {
-    const r = window.prompt(
-      "Absolute path to a project folder (new or existing)",
-      root || settings.lastWorkspace || "",
-    );
-    if (!r) return;
-    const commit = (path: string) => {
+  const commitRoot = useCallback(
+    (path: string) => {
       setRoot(path);
+      setDocs([]);
+      setActive(null);
       const next = { ...settings, lastWorkspace: path };
       setSettings(next);
       saveSettings(next);
-    };
-    try {
-      commit((await api.openProject(r)).root_path);
-    } catch (e) {
-      if (String(e).includes("does not exist") && window.confirm(`Create new project folder?\n\n${r}`)) {
-        try {
-          commit((await api.openProject(r, true)).root_path);
-        } catch (e2) {
-          setToast(`create: ${e2}`);
-        }
-      } else {
+    },
+    [settings],
+  );
+
+  const pickAndOpen = useCallback(
+    async (path: string) => {
+      setShowPicker(false);
+      try {
+        commitRoot((await api.openProject(path, true)).root_path);
+      } catch (e) {
         setToast(`open: ${e}`);
       }
+    },
+    [api, commitRoot],
+  );
+
+  async function openFolder() {
+    const native = await tauriPickFolder();
+    if (native) {
+      void pickAndOpen(native);
+      return;
     }
+    setShowPicker(true);
   }
 
   async function openFile(path: string) {
@@ -234,6 +249,15 @@ export function App() {
           title={pendingDiff.title}
           onAccept={acceptDiff}
           onReject={() => setPendingDiff(null)}
+        />
+      )}
+
+      {showPicker && (
+        <FolderPicker
+          api={api}
+          start={settings.lastWorkspace || root || ""}
+          onPick={pickAndOpen}
+          onClose={() => setShowPicker(false)}
         />
       )}
 

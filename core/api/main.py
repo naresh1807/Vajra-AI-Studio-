@@ -79,6 +79,8 @@ from core.api.schemas import (
     SimpleOk,
     TerminalRunRequest,
     TerminalRunResult,
+    TestDiscoverRequest,
+    TestRunRequest,
     TreeRequest,
 )
 from core.config import get_settings
@@ -94,6 +96,7 @@ from core.rag import rag_manager
 from core.runtime import format as fmtsvc
 from core.runtime import git as gitsvc
 from core.runtime import process_manager
+from core.runtime import testing as testsvc
 from core.tools import ToolContext
 from core.tools.process_tools import RunCommandTool
 from core.workspace import (
@@ -397,6 +400,21 @@ async def assist_complete(req: InlineCompleteRequest) -> dict:
         prefix=req.prefix, suffix=req.suffix, language=req.language, path=req.path
     )
     return {"text": text}
+
+
+# -- test explorer ------------------------------------------------
+@app.post("/api/testing/discover", dependencies=AUTH)
+async def testing_discover(req: TestDiscoverRequest) -> dict:
+    return await testsvc.discover(req.root)
+
+
+@app.post("/api/testing/run", dependencies=AUTH)
+async def testing_run(req: TestRunRequest) -> dict:
+    run = await testsvc.run_tests(req.root, req.node_ids or None)
+    await events.record(
+        "report", note=f"tests: {run.framework} {'ok' if run.ok else 'failed'} {run.totals}"
+    )
+    return run.as_dict()
 
 
 # -- RAG: local semantic index over the workspace ------------------

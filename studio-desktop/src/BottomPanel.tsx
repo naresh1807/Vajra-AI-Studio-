@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Api, DebugState } from "./api";
 import type { Problem } from "./App";
 import { DebugPanel } from "./DebugPanel";
+import { TestPanel } from "./TestPanel";
 
-type Tab = "problems" | "terminal" | "output" | "services" | "debug";
+type Tab = "problems" | "terminal" | "output" | "services" | "debug" | "tests";
 
 export function BottomPanel({
   api,
@@ -105,6 +106,9 @@ export function BottomPanel({
         <button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>
           Services {running.length ? `(${running.length})` : ""}
         </button>
+        <button className={tab === "tests" ? "active" : ""} onClick={() => setTab("tests")}>
+          Tests
+        </button>
         <button className={tab === "debug" ? "active" : ""} onClick={() => setTab("debug")}>
           Debug {debug && debug.state !== "terminated" ? "●" : ""}
         </button>
@@ -113,6 +117,8 @@ export function BottomPanel({
       {tab === "debug" && (
         <DebugPanel api={api} state={debug} setState={setDebug} onFrame={onDebugFrame} />
       )}
+
+      {tab === "tests" && <TestPanel api={api} root={root} onOpen={onOpenAt} />}
 
       {tab === "problems" && (
         <div className="problems">

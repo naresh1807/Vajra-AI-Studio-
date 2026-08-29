@@ -111,6 +111,27 @@ export class Api {
     );
   }
 
+  testDiscover(root: string) {
+    return this.j<{ framework: string; tests: string[] }>(`/api/testing/discover`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root }),
+    });
+  }
+  testRun(root: string, nodeIds?: string[]) {
+    return this.j<{
+      framework: string;
+      ok: boolean;
+      cases: Array<{ id: string; outcome: string }>;
+      totals: Record<string, number>;
+      output: string;
+    }>(`/api/testing/run`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root, node_ids: nodeIds || [] }),
+    });
+  }
+
   ragSearch(root: string, query: string, k = 8) {
     return this.j<{ hits: Array<{ ref: string; path: string; start_line: number; end_line: number; score: number; text: string }> }>(
       `/api/rag/search`,

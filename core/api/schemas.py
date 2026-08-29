@@ -216,6 +216,15 @@ class ComputerRunResult(BaseModel):
     succeeded: bool = True
 
 
+class TestDiscoverRequest(BaseModel):
+    root: str = Field(min_length=1)
+
+
+class TestRunRequest(BaseModel):
+    root: str = Field(min_length=1)
+    node_ids: list[str] = []
+
+
 class RagReindexRequest(BaseModel):
     root: str = Field(min_length=1)
 

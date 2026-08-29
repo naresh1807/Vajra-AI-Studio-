@@ -124,6 +124,17 @@ def test_osdev_providers_route(client):
     assert r.status_code == 200 and "x86_64" in r.json()["qemu"]
 
 
+def test_testing_discover_route(client, tmp_workspace):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    (tmp_workspace / "test_probe.py").write_text("def test_probe(): assert 1\n", encoding="utf-8")
+    r = c.post("/api/testing/discover", json={"root": str(tmp_workspace)}, headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["framework"] == "pytest"
+    assert any("test_probe" in t for t in body["tests"])
+
+
 def test_rag_reindex_search_status(client, tmp_workspace):
     c, token = client
     h = {"X-Vajra-Token": token}

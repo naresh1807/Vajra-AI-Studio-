@@ -1,0 +1,18 @@
+# Optional: run the Vajra Core API in a container. The Desktop App normally starts
+# `vajra-api` directly on the host; this is for headless / CI use.
+services:
+  vajra-core:
+    build:
+      context: .
+      dockerfile: installers/windows/Dockerfile.core
+    image: vajra-core:0.1.0
+    environment:
+      - VAJRA_HOST=0.0.0.0
+      - VAJRA_PORT=8760
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - VAJRA_PAIRING_TOKEN=${VAJRA_PAIRING_TOKEN:-change-me-local-only}
+    ports:
+      - "127.0.0.1:8760:8760"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs

@@ -1,0 +1,39 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262b36;
+  --fg: #e6e8ec;
+  --muted: #8a92a3;
+  --accent: #6ea8fe;
+  --ok: #4ade80;
+  --bad: #f87171;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+.app { display: grid; grid-template-columns: 190px 1fr; height: 100vh; }
+.side { background: var(--panel); border-right: 1px solid var(--border); padding: 12px 8px; }
+.brand { font-weight: 700; letter-spacing: .5px; padding: 8px; color: var(--accent); }
+.nav button {
+  display: block; width: 100%; text-align: left; background: none; border: none; color: var(--fg);
+  padding: 8px; border-radius: 6px; cursor: pointer; font: inherit;
+}
+.nav button.active { background: var(--border); }
+.main { padding: 18px 22px; overflow: auto; }
+h1 { font-size: 18px; margin: 0 0 14px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+.row { display: flex; gap: 8px; align-items: center; }
+input, textarea {
+  background: #0c0e12; border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 8px; font: inherit; width: 100%;
+}
+button.primary { background: var(--accent); color: #08111f; border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 600; }
+button.ghost { background: none; border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+.muted { color: var(--muted); }
+.task { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--border); }
+.badge.passed { background: #14351f; color: var(--ok); }
+.badge.failed { background: #3a1616; color: var(--bad); }
+.badge.running { background: #16283a; color: var(--accent); }
+pre.log { background: #0c0e12; border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 45vh; overflow: auto; font-size: 12px; }

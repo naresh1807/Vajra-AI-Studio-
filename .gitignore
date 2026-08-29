@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Env & secrets
+.env
+*.key
+*.pem
+
+# Data / local state
+*.db
+*.sqlite3
+data/
+logs/
+.vajra/
+
+# Node
+node_modules/
+dist/
+out/
+*.vsix
+.vite/
+
+# Rust / Tauri
+target/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/

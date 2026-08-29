@@ -1,0 +1,22 @@
+# Model routing config. Provider/model names are resolved from env at load time.
+# Agents call the router interface only -- never hard-code a provider.
+
+primary:
+  provider: nvidia_nim
+  model: ${VAJRA_NEMOTRON_MODEL}
+  base_url: ${NVIDIA_BASE_URL}
+  api_key_env: NVIDIA_API_KEY
+  timeout_seconds: 120
+  max_context_tokens: 128000
+
+fallback:
+  provider: local
+  model: ${VAJRA_LOCAL_MODEL}
+  base_url: ${VAJRA_LOCAL_BASE_URL}
+  api_key_env: null
+  timeout_seconds: 300
+  max_context_tokens: 32000
+
+retry:
+  transient_attempts: 3
+  backoff_seconds: 2

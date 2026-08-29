@@ -1,0 +1,58 @@
+{
+  "name": "vajra-ai",
+  "displayName": "Vajra AI",
+  "description": "Vajra AI coordinator - chat, autonomous tasks, and workspace review powered by your local Vajra Core.",
+  "version": "0.1.0",
+  "publisher": "vajra",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Machine Learning"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "vajra.ask", "title": "Vajra: Ask" },
+      { "command": "vajra.autonomousTask", "title": "Vajra: Autonomous Task" },
+      { "command": "vajra.runTests", "title": "Vajra: Run Tests" },
+      { "command": "vajra.reviewWorkspace", "title": "Vajra: Review Workspace" },
+      { "command": "vajra.openPanel", "title": "Vajra: Open Panel" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "vajra", "title": "Vajra AI", "icon": "media/icon.svg" }
+      ]
+    },
+    "views": {
+      "vajra": [
+        { "id": "vajra.chat", "name": "Vajra", "type": "webview" }
+      ]
+    },
+    "configuration": {
+      "title": "Vajra AI",
+      "properties": {
+        "vajra.apiUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8760",
+          "description": "Vajra Local API base URL."
+        },
+        "vajra.pairingToken": {
+          "type": "string",
+          "default": "change-me-local-only",
+          "description": "Pairing token shared with your local Vajra Core (matches VAJRA_PAIRING_TOKEN)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "npm run build -- --watch",
+    "package": "vsce package -o vajra-ai.vsix",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}

@@ -82,7 +82,7 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --target=node18",
     "watch": "npm run build -- --watch --sourcemap",
-    "package": "vsce package -o vajra-ai.vsix",
+    "package": "vsce package -o vajra-ai.vsix --allow-missing-repository",
     "lint": "tsc --noEmit"
   },
   "devDependencies": {

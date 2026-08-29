@@ -2,7 +2,8 @@
 
 The Vajra surface for VS Code. Delegates all reasoning and execution to your
 **local Vajra Core**; supplies editor context (active file, selection,
-workspace). Also the built-in extension bundled by the [Studio fork](../studio/).
+workspace). This is also the built-in extension bundled by the Studio fork
+(`studio/` in the repo root).
 
 ## Develop
 

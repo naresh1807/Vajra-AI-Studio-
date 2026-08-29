@@ -3,8 +3,15 @@
   product.json, and bundles the Vajra extension as a built-in. Run build.ps1
   afterwards to compile the app.
 
-  Prereqs: git, Node 20/22, Python 3.x, and the VS C++ Build Tools (all already
-  installed for this repo). ~10 GB disk, first `npm ci` ~15 min.
+  Prereqs (one-time, admin):
+    winget install Git.Git OpenJS.NodeJS.LTS Python.Python.3.12
+    "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
+      --installPath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools" `
+      --add Microsoft.VisualStudio.Workload.VCTools `
+      --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre `
+      --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --quiet
+  (VS Code's native modules require the Spectre-mitigated MSVC libraries.)
+  ~10 GB disk, first `npm ci` ~15-20 min.
 
   Usage:  scripts\bootstrap.ps1 [-Tag 1.135.0]
 #>

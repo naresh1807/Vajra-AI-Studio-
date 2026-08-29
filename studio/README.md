@@ -18,6 +18,19 @@ studio/
 
 ## Build
 
+One-time prereqs (admin) — git, Node LTS, Python 3.12, and VS Build Tools **with
+the Spectre-mitigated MSVC libraries** (VS Code's native modules require them):
+
+```powershell
+"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
+  --installPath "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools" `
+  --add Microsoft.VisualStudio.Workload.VCTools `
+  --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre `
+  --add Microsoft.VisualStudio.Component.Windows11SDK.22621 --quiet
+```
+
+Then:
+
 ```powershell
 cd studio
 scripts\bootstrap.ps1 -Tag 1.135.0     # pick the latest stable tag from github.com/microsoft/vscode/tags

@@ -102,6 +102,15 @@ def test_terminal_run(client, tmp_workspace):
     assert body["exit_code"] == 0 and body["stdout"].strip() == "42"
 
 
+def test_proc_list_empty_and_authed(client):
+    # ProcessManager lifecycle is covered directly in test_processes.py; here we
+    # only check the route is wired and auth-gated (TestClient + Windows Proactor
+    # subprocess transports don't share an event loop, so we don't spawn here).
+    c, token = client
+    assert c.get("/api/proc/list").status_code == 401
+    assert c.get("/api/proc/list", headers={"X-Vajra-Token": token}).status_code == 200
+
+
 def test_agent_chat(client):
     c, token = client
     r = c.post("/api/agent/chat", json={"message": "hi"}, headers={"X-Vajra-Token": token})

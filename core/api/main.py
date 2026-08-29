@@ -50,6 +50,8 @@ from core.api.schemas import (
     FileWriteRequest,
     GitRequest,
     OpenProjectRequest,
+    ProcStartRequest,
+    ProcStopRequest,
     ProjectInfo,
     SimpleOk,
     TerminalRunRequest,
@@ -61,6 +63,7 @@ from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
+from core.runtime import process_manager
 from core.tools import ToolContext
 from core.tools.git_tools import GitDiffTool, GitStatusTool
 from core.tools.process_tools import RunCommandTool
@@ -81,6 +84,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         app.state.persist_task.cancel()
+        await process_manager.stop_all()
 
 
 app = FastAPI(title="Vajra Core API", version="0.2.0", lifespan=lifespan)
@@ -319,6 +323,41 @@ async def terminal_run(req: TerminalRunRequest) -> TerminalRunResult:
         cwd=req.root,
         command=argv,
     )
+
+
+# -- long-running processes (dev servers) --------------------
+@app.post("/api/proc/start", dependencies=AUTH)
+async def proc_start(req: ProcStartRequest) -> dict:
+    try:
+        mp = await process_manager.start(req.command, cwd=req.root, label=req.label or "")
+    except (FileNotFoundError, OSError) as exc:
+        raise HTTPException(400, f"cannot start: {exc}") from exc
+    await asyncio.sleep(1.5)
+    snap = mp.snapshot()
+    await events.record(
+        "process.started", label=snap["label"], process_id=mp.id, url=snap["url"], running=snap["running"]
+    )
+    return snap
+
+
+@app.get("/api/proc/list", dependencies=AUTH)
+async def proc_list() -> list[dict]:
+    process_manager.prune()
+    return [mp.snapshot(tail=0) for mp in process_manager.list()]
+
+
+@app.get("/api/proc/{proc_id}/output", dependencies=AUTH)
+async def proc_output(proc_id: str, tail: int = 200) -> dict:
+    mp = process_manager.get(proc_id)
+    if not mp:
+        raise HTTPException(404, "unknown process")
+    return mp.snapshot(tail=tail)
+
+
+@app.post("/api/proc/stop", dependencies=AUTH)
+async def proc_stop(req: ProcStopRequest) -> SimpleOk:
+    ok = await process_manager.stop(req.process_id)
+    return SimpleOk(ok=ok, detail="stopped" if ok else "unknown process")
 
 
 # -- git --------------------------------------------------------

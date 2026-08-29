@@ -73,6 +73,14 @@ button.mini.on { background: var(--accent); color: #08111f; border-color: var(--
 .output .ev { display: flex; gap: 8px; }
 .output .ev .k { color: var(--accent); min-width: 130px; }
 
+.services { flex: 1; overflow: auto; padding: 8px 10px; font-size: 12px; }
+.svc-start { display: flex; gap: 6px; margin-bottom: 8px; }
+.svc-start button { background: var(--panel2); border: 1px solid var(--border); color: var(--fg); border-radius: 6px; padding: 4px 12px; }
+.svc-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); }
+.svc-label { font-family: ui-monospace, Consolas, monospace; }
+.svc-url { color: var(--accent); text-decoration: none; }
+.svc-url:hover { text-decoration: underline; }
+
 /* agent panel */
 .agent { background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
 .agent .seg { display: flex; gap: 4px; }

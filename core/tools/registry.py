@@ -83,7 +83,13 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         GitRestoreTool,
         GitStatusTool,
     )
-    from core.tools.process_tools import RunCommandTool
+    from core.tools.process_tools import (
+        ListProcessesTool,
+        ReadProcessOutputTool,
+        RunCommandTool,
+        StartProcessTool,
+        StopProcessTool,
+    )
     from core.tools.quality_tools import RunBuildTool, RunLinterTool, RunTestsTool
     from core.tools.search_tools import ProjectTreeTool, SearchTextTool
 
@@ -96,6 +102,10 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         SearchTextTool,
         ProjectTreeTool,
         RunCommandTool,
+        StartProcessTool,
+        ReadProcessOutputTool,
+        StopProcessTool,
+        ListProcessesTool,
         RunTestsTool,
         RunLinterTool,
         RunBuildTool,

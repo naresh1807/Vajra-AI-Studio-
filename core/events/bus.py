@@ -31,6 +31,10 @@ EventKind = Literal[
     "approval.requested",
     "approval.resolved",
     "model.request",
+    "terminal.run",
+    "process.started",
+    "process.stopped",
+    "file.written",
     "error",
     "report",
 ]

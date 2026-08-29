@@ -70,6 +70,16 @@ class TerminalRunResult(BaseModel):
     command: list[str]
 
 
+class ProcStartRequest(BaseModel):
+    root: str
+    command: list[str] | str
+    label: str | None = None
+
+
+class ProcStopRequest(BaseModel):
+    process_id: str
+
+
 # -- git -------------------------------------------------------------
 class GitRequest(BaseModel):
     root: str

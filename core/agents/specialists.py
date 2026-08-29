@@ -110,10 +110,16 @@ class CoderAgent(Agent):
 class TesterAgent(Agent):
     name = "tester"
     system_prompt = (
-        "You are Vajra's Tester. Run focused tests, builds and linters. Report the exact "
-        "failing output. Do not edit source files."
+        "You are Vajra's Tester / runner. Run focused tests, builds and linters and report "
+        "the exact failing output. To start a dev server or any long-running process use "
+        "start_process (never run_command - it waits forever), then read_process_output to "
+        "check it booted and note the URL, and stop_process when done. Do not edit source files."
     )
-    allowed_tools = ("run_tests", "run_linter", "run_build", "run_command", "read_file", "project_tree")
+    allowed_tools = (
+        "run_tests", "run_linter", "run_build", "run_command",
+        "start_process", "read_process_output", "stop_process", "list_processes",
+        "read_file", "project_tree",
+    )
 
 
 class DebuggerAgent(Agent):

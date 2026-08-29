@@ -110,6 +110,31 @@ export class Api {
     );
   }
 
+  procList() {
+    return this.j<
+      Array<{ id: string; label: string; running: boolean; url: string | null; exit_code: number | null }>
+    >(`/api/proc/list`, { headers: this.h(false) }).catch(() => []);
+  }
+  procStart(root: string, command: string, label?: string) {
+    return this.j<{ id: string; running: boolean; url: string | null; output: string }>(`/api/proc/start`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root, command, label }),
+    });
+  }
+  procOutput(id: string) {
+    return this.j<{ output: string; running: boolean; url: string | null }>(`/api/proc/${id}/output`, {
+      headers: this.h(false),
+    });
+  }
+  procStop(id: string) {
+    return fetch(`${this.s.apiUrl}/api/proc/stop`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ process_id: id }),
+    });
+  }
+
   gitStatus(root: string) {
     return this.j<{ stdout: string; stderr: string }>(`/api/git/status?root=${encodeURIComponent(root)}`, {
       headers: this.h(false),

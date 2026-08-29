@@ -28,7 +28,7 @@ log = logging.getLogger("vajra.orchestrator")
 _MAX_AGENT_TURNS = 6
 _MAX_GRAPH_STEPS = 24
 _MAX_DEBUG_ROUNDS = 2
-_TEST_TOOLS = {"run_tests", "run_build", "run_command"}
+_TEST_TOOLS = {"run_tests", "run_build", "run_command", "start_process"}
 
 
 @dataclass
@@ -201,7 +201,9 @@ class Orchestrator:
                         continue
                 result = await self.registry.execute(call, tool_ctx)
                 changed.extend(result.changed_files)
-                if call.tool_name in _TEST_TOOLS:
+                if call.tool_name == "start_process":
+                    test_results.append(bool(result.metadata.get("running")))
+                elif call.tool_name in _TEST_TOOLS:
                     test_results.append(result.success and (result.exit_code in (0, None)))
                 if not result.success and result.metadata.get("policy"):
                     infra_error = f"policy blocked {call.tool_name}"

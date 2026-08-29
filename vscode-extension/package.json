@@ -22,6 +22,10 @@
       { "command": "vajra.discoverTests", "title": "Vajra: Discover Tests" },
       { "command": "vajra.setMarketplace", "title": "Vajra: Set Extension Gallery (Open VSX / Microsoft)" },
       { "command": "vajra.installAIExtensions", "title": "Vajra: Install AI Extensions (Copilot, Claude Code, ChatGPT…)" },
+      { "command": "vajra.startCore", "title": "Vajra: Start Core" },
+      { "command": "vajra.stopCore", "title": "Vajra: Stop Core" },
+      { "command": "vajra.restartCore", "title": "Vajra: Restart Core" },
+      { "command": "vajra.showCoreLog", "title": "Vajra: Show Core Log" },
       { "command": "vajra.assist.edit", "title": "Vajra: Edit with instruction… (Ctrl+K)" },
       { "command": "vajra.assist.explain", "title": "Vajra: Explain" },
       { "command": "vajra.assist.fix", "title": "Vajra: Fix" },
@@ -77,6 +81,21 @@
           "type": "boolean",
           "default": false,
           "description": "Inline completions from the Core. Only useful with a fast local coding model; the hosted Nemotron is a reasoning model and too slow for keystroke latency."
+        },
+        "vajra.autoStartCore": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the local Vajra Core automatically when Studio opens if it isn't already running."
+        },
+        "vajra.coreCommand": {
+          "type": "string",
+          "default": "vajra-api",
+          "description": "Command that launches the Vajra Core (installed via `pip install -e .` in the Vajra repo)."
+        },
+        "vajra.coreCwd": {
+          "type": "string",
+          "default": "",
+          "description": "Working directory for the Core (where its .env lives). Defaults to the open folder, else your home directory."
         }
       }
     }

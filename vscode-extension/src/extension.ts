@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { VajraClient } from "./client";
 import { VajraChatView } from "./chatView";
+import { CoreManager } from "./core";
 import { registerAssist } from "./assist";
 import { registerCompletions } from "./completions";
 import { registerTests } from "./tests";
@@ -9,7 +10,17 @@ import { registerMarketplace } from "./marketplace";
 
 export function activate(ctx: vscode.ExtensionContext): void {
   const client = new VajraClient();
+  const core = new CoreManager(client);
   const view = new VajraChatView(client);
+  ctx.subscriptions.push(core);
+
+  void core.ensureRunning();
+  ctx.subscriptions.push(
+    vscode.commands.registerCommand("vajra.startCore", () => core.start()),
+    vscode.commands.registerCommand("vajra.stopCore", () => core.stop()),
+    vscode.commands.registerCommand("vajra.restartCore", () => core.restart()),
+    vscode.commands.registerCommand("vajra.showCoreLog", () => core.show()),
+  );
 
   ctx.subscriptions.push(
     vscode.window.registerWebviewViewProvider(VajraChatView.viewId, view, {
@@ -35,7 +46,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
   registerAssist(ctx, client);
   registerCompletions(ctx, client);
   registerTests(ctx, client);
-  registerMisc(ctx, client);
+  registerMisc(ctx, client, core);
   registerMarketplace(ctx);
 }
 

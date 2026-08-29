@@ -1,28 +1,58 @@
 /** Status bar, semantic search, git checkpoint, project sync. */
 import * as vscode from "vscode";
 import { VajraClient } from "./client";
+import { CoreManager } from "./core";
 
-export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient) {
+export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, core: CoreManager) {
   const root = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  status.command = "vajra.openPanel";
+  status.command = "vajra.coreMenu";
   ctx.subscriptions.push(status);
+
+  const setState = (s: "up" | "starting" | "down", model = "") => {
+    status.text =
+      s === "up" ? "$(sparkle) Vajra ●" : s === "starting" ? "$(sync~spin) Vajra…" : "$(sparkle) Vajra ○";
+    status.tooltip =
+      s === "up"
+        ? `Vajra Core online${model ? ` — ${model}` : ""}`
+        : s === "starting"
+          ? "Starting Vajra Core…"
+          : "Vajra Core offline — click to start";
+    status.show();
+  };
+  setState("down");
+  ctx.subscriptions.push(core.onState((s) => setState(s)));
+
   const refresh = async () => {
     try {
       const h = await client.health();
-      const model = h.models?.primary ?? "";
-      status.text = `$(sparkle) Vajra ${h.status === "ok" ? "●" : "○"}`;
-      status.tooltip = `Vajra Core ${h.status} — ${model}`;
+      setState(h.status === "ok" ? "up" : "down", h.models?.primary ?? "");
     } catch {
-      status.text = "$(sparkle) Vajra ○";
-      status.tooltip = "Vajra Core offline";
+      setState("down");
     }
-    status.show();
   };
   void refresh();
   const timer = setInterval(refresh, 15000);
   ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
+
+  ctx.subscriptions.push(
+    vscode.commands.registerCommand("vajra.coreMenu", async () => {
+      const up = await core.isUp();
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "$(comment-discussion) Open Vajra Panel", cmd: "vajra.openPanel" },
+          up
+            ? { label: "$(debug-restart) Restart Core", cmd: "vajra.restartCore" }
+            : { label: "$(play) Start Core", cmd: "vajra.startCore" },
+          { label: "$(stop) Stop Core", cmd: "vajra.stopCore" },
+          { label: "$(output) Show Core Log", cmd: "vajra.showCoreLog" },
+        ],
+        { placeHolder: `Vajra Core is ${up ? "online" : "offline"}` },
+      );
+      if (pick) void vscode.commands.executeCommand(pick.cmd);
+    }),
+  );
 
   // open the workspace in the Core + build the semantic index
   if (root()) {

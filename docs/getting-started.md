@@ -3,7 +3,7 @@
 ## 1. Prerequisites
 
 - Windows 10/11, Python 3.12+, Node.js LTS, Git
-- (optional) Rust + WebView2 for the Tauri desktop window
+- Rust (`rustup`) + WebView2 — for the native desktop app / installer
 - (optional) NVIDIA API key for hosted NIM / Nemotron
 
 ## 2. Vajra Core + API
@@ -19,43 +19,54 @@ Edit `.env`:
 
 ```
 NVIDIA_API_KEY=nvapi-...
-VAJRA_NEMOTRON_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1
+VAJRA_NEMOTRON_MODEL=nvidia/nemotron-3-super-120b-a12b
 VAJRA_PAIRING_TOKEN=<pick a long random string>
 ```
 
 Run:
 
 ```powershell
-pytest -q          # 23 tests
-vajra-api          # http://127.0.0.1:8760
+pytest -q          # ~70 tests
+vajra-api          # http://127.0.0.1:8760  (check /api/health)
 ```
 
-## 3. VS Code extension
+The bundled language servers and formatters install with the frontend:
 
 ```powershell
-cd vscode-extension
-npm install
-npm run build
+cd extensions/language-servers && npm install && cd ../..
 ```
 
-Open this folder in VS Code, press F5. In the Extension Dev Host, set
-`vajra.pairingToken` to the same value as `.env`, then use the **Vajra** side panel
-or the `Vajra: Autonomous Task` command.
-
-## 4. Desktop UI
+## 3. Vajra AI Studio (the IDE)
 
 ```powershell
 cd studio-desktop
 npm install
-npm run dev        # http://localhost:1420
+npm run dev        # browser UI on http://localhost:1420
+# or:
+npm run tauri dev  # native window
 ```
 
-Set the pairing token in **Settings**, then drive goals from **Chat / Goal**.
+**Settings** → set the pairing token to match `.env` → **Open Folder**.
+
+## 4. VS Code extension (optional)
+
+```powershell
+cd vscode-extension && npm install && npm run build
+```
+
+Open the folder in VS Code, press F5, set `vajra.pairingToken`, use the **Vajra** panel.
 
 ## 5. One-shot dev stack
 
 ```powershell
-pwsh -File scripts/dev.ps1
+pwsh -File scripts/dev.ps1        # Core + Studio together
+```
+
+## 6. Build the installer
+
+```powershell
+cd studio-desktop
+npm run tauri build              # -> src-tauri/target/release/bundle/nsis/*-setup.exe
 ```
 
 ## Smoke test the autonomous loop
@@ -64,8 +75,7 @@ With the Core running and a valid model key:
 
 ```powershell
 $h = @{ "X-Vajra-Token" = "<token>"; "Content-Type" = "application/json" }
-$body = @{ text = "create hello.txt containing the word vajra, then run the tests"; workspace_root = "E:\some\project" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8760/api/v1/goals -Headers $h -Body $body
+$body = @{ goal = "create hello.txt containing the word vajra, then run the tests"; workspace_root = "E:\some\project" } | ConvertTo-Json
+$run = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8760/api/agent/run -Headers $h -Body $body
+Invoke-RestMethod -Uri "http://127.0.0.1:8760/api/agent/runs/$($run.id)" -Headers $h   # poll
 ```
-
-Poll `GET /api/v1/goals/{id}` for the task graph and `GET /api/v1/diff/{id}` for changed files.

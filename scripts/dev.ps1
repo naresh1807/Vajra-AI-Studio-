@@ -1,4 +1,4 @@
-# Start the Vajra dev stack: Core API + Desktop UI.
+# Start the Vajra dev stack: Core API + Vajra AI Studio (desktop IDE).
 # Usage:  pwsh -File scripts/dev.ps1
 
 $ErrorActionPreference = "Stop"
@@ -15,12 +15,12 @@ if (-not (Test-Path "$root\.env")) {
 }
 
 Write-Host "Starting Vajra Core on http://127.0.0.1:8760 ..." -ForegroundColor Green
-$core = Start-Process "$root\.venv\Scripts\python.exe" -ArgumentList "-m","uvicorn","api.main:app","--host","127.0.0.1","--port","8760" -WorkingDirectory $root -PassThru
+$core = Start-Process "$root\.venv\Scripts\python.exe" -ArgumentList "-m","uvicorn","core.api.main:app","--host","127.0.0.1","--port","8760" -WorkingDirectory $root -PassThru
 
 Start-Sleep -Seconds 3
-Write-Host "Starting Desktop UI on http://localhost:1420 ..." -ForegroundColor Green
+Write-Host "Starting Vajra AI Studio on http://localhost:1420 ..." -ForegroundColor Green
 try {
-    Push-Location "$root\apps\desktop"
+    Push-Location "$root\studio-desktop"
     if (-not (Test-Path "node_modules")) { npm install }
     npm run dev
 } finally {

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "vajra-ai"
 version = "0.1.0"
-description = "Vajra AI - Personal Autonomous Engineering Agent (local Vajra Core + API)"
+description = "Vajra AI Studio - private local-first AI-native IDE and computer agent (Vajra Core)"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Naresh Thatikonda" }]
@@ -28,10 +28,10 @@ dev = [
 ]
 
 [project.scripts]
-vajra-api = "api.main:run"
+vajra-api = "core.api.main:run"
 
 [tool.hatch.build.targets.wheel]
-packages = ["core", "api", "database"]
+packages = ["core", "database"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

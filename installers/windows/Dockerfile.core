@@ -3,7 +3,6 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY core ./core
-COPY api ./api
 COPY database ./database
 COPY config ./config
 

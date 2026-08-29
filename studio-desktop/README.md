@@ -6,7 +6,7 @@ It can start/stop the local Vajra Core (`vajra-api`) as a sidecar.
 ## Dev (browser UI only)
 
 ```powershell
-cd apps/desktop
+cd studio-desktop
 npm install
 npm run dev        # http://localhost:1420 — talks to Vajra Core on :8760
 ```

@@ -21,7 +21,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("VAJRA_DB_PATH", f"./data/api-test-{tmp_path.name}.db")
     import importlib
 
-    import api.main as main
+    import core.api.main as main
 
     importlib.reload(main)
     stub = _StubRouter()

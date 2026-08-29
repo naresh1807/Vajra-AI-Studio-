@@ -1,23 +1,24 @@
-# Vajra AI
+# Vajra AI Studio
 
-**Personal Autonomous Engineering Agent** — a private, local-first AI software engineer
-and computer agent. You give a high-level goal; Vajra plans → builds → tests → debugs →
-reviews → completes, coordinating VS Code, files, terminals, Git, Docker and VMs.
+A private, local-first **AI-native IDE and computer agent**. A VS Code-class desktop
+editor where you can write code manually, ask for inline assistance, or hand Vajra a
+high-level goal and let it plan → edit → save → run → test → debug → review → report.
 
-> Not a SaaS. The Windows **Desktop App** is the primary execution host; the **Android**
-> app is a secure companion; the **VS Code extension** is the primary engineering surface.
-> No public hosting is required.
+> Not a chatbot, not just a VS Code extension. The **desktop IDE (Vajra AI Studio)** is
+> the product and the primary execution host. **Vajra Mobile** is a secure Android
+> control client. An optional **VS Code extension** brings the same agent brain into VS
+> Code. No public hosting required.
 
 ## Repository layout
 
 | Path | What |
 |------|------|
-| `core/` | Vajra Core — orchestrator, agents, tools, model router, policy, memory, workspace discovery |
-| `api/` | Vajra Local API (FastAPI + WebSocket) — the secure localhost surface for all clients |
+| `core/` | Vajra Core — `api/` (FastAPI + WS), `orchestrator/`, `agents/`, `llm/` (model router), `tools/`, `policy/`, `memory/`, `workspace/`, `events/` |
 | `database/` | SQLite store + repositories (Postgres-swappable) |
-| `vscode-extension/` | TypeScript VS Code coordinator extension |
-| `apps/desktop/` | Windows desktop shell (React + Vite, Tauri wrapper) |
-| `apps/android/` | Android companion app (placeholder — Phase 0) |
+| `studio-desktop/` | **Vajra AI Studio** — Tauri + React + Monaco IDE (`src/`, `src-tauri/`) |
+| `mobile-android/flutter_app/` | Vajra Mobile companion (placeholder — Phase 0/7) |
+| `vscode-extension/` | Optional VS Code Coordinator extension |
+| `extensions/` | Language/tool packs — LSP servers, DAP adapters, formatters, linters, templates |
 | `config/models.yaml` | Model routing config (Nemotron/NIM primary, local fallback) |
 | `tests/` | pytest suite |
 
@@ -32,11 +33,17 @@ pytest -q                    # run the test suite
 vajra-api                    # start Vajra Core on http://127.0.0.1:8760
 ```
 
-Check it is up:
+Check it is up: `curl http://127.0.0.1:8760/api/health`
+
+Run the Studio UI:
 
 ```powershell
-curl http://127.0.0.1:8760/health
+cd studio-desktop
+npm install
+npm run dev                  # http://localhost:1420
 ```
+
+Or `pwsh -File scripts/dev.ps1` to start both.
 
 ## Model layer
 
@@ -45,22 +52,30 @@ names are resolved from `config/models.yaml` + environment — never hard-coded.
 NVIDIA NIM / Nemotron; fallback is any OpenAI-compatible local endpoint (Ollama, vLLM,
 llama.cpp). Swapping providers needs no agent-code changes.
 
+## Three modes
+
+- **Manual** — write code directly: file tree, Monaco editor, tabs, save, terminal, Git.
+- **Assisted** — inline completions, select-and-ask, right-click Explain / Fix / Refactor /
+  Optimize / Write Tests / Document; every AI edit shown as a diff before applying.
+- **Agent** — give a goal; Vajra scans, plans a task graph, edits, runs tests, debugs,
+  reviews, commits, and shows the final diff.
+
 ## Safety model
 
 - **Tool-mediated execution** — the LLM never gets a raw shell. Every action is a typed
   tool call validated by the policy engine (`core/policy/engine.py`).
-- **Approval gates** — elevated/high-risk calls park in the approval gate until a client
-  approves them. Critical patterns (disk format, disabling protections) are blocked.
-- **Reversible** — Git checkpoints/tags before edit batches; rollback touches only
-  Vajra-owned changes.
-- **Observable** — every plan, tool call, patch and test emits a structured event
-  (`logs/task_events.jsonl` + `audit_events` table); secrets are redacted before persistence.
-- **Bounded autonomy** — 2 same-strategy retries, then force a re-plan. No infinite loops.
+- **Approval gates** — elevated/high-risk calls park until a client approves them.
+  Critical patterns (disk format, disabling protections) are blocked outright.
+- **Reversible** — Git checkpoints/tags before edit batches; every file write keeps
+  diff + rollback data; rollback touches only Vajra-owned changes.
+- **Observable** — every plan, tool call, patch, command and test emits a structured
+  event (`logs/task_events.jsonl` + DB); secrets are redacted before persistence.
+- **Bounded autonomy** — 2 same-strategy retries, then re-plan. No infinite loops.
 
-## Roadmap
+## Roadmap (v3.0)
 
-Phase 0 product shells → Phase 1 core developer foundation (**here**) → Phase 2 VS Code
-coordinator → Phase 3 autonomous loop → Phase 4 computer agent → Phase 5 memory/RAG →
-Phase 6 OS engineering → Phase 7 authorized security → Phase 8 voice/multimodal.
+0 shells · 1 manual editor · 2 language support (LSP) · 3 Nemotron assistant ·
+**4 autonomous loop (working)** · 5 Git + rollback · 6 computer agent · 7 Android ·
+8 multi-language · 9 OS agent · 10 authorized security.
 
-See `docs/` and the *Complete Developer Manual*.
+See `docs/` and *Vajra AI Studio Complete Developer Manual v3.0*.

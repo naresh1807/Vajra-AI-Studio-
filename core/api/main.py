@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.schemas import (
+from core.api.schemas import (
     ApproveRequest,
     ChatRequest,
     ChatResponse,
@@ -256,7 +256,7 @@ def run() -> None:
     import uvicorn
 
     uvicorn.run(
-        "api.main:app",
+        "core.api.main:app",
         host=settings.vajra_host,
         port=settings.vajra_port,
         reload=False,

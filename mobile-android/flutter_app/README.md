@@ -22,7 +22,7 @@ Flutter. Talks to the same `POST /api/v1/goals`, `GET /api/v1/goals/{id}`,
 ## Bootstrap (once Flutter SDK is installed)
 
 ```powershell
-cd apps/android
+cd mobile-android/flutter_app
 flutter create --org ai.vajra --project-name vajra_companion .
 # then add http/websocket client + the screens above
 flutter run

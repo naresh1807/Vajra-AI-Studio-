@@ -45,7 +45,7 @@ or the `Vajra: Autonomous Task` command.
 ## 4. Desktop UI
 
 ```powershell
-cd apps/desktop
+cd studio-desktop
 npm install
 npm run dev        # http://localhost:1420
 ```

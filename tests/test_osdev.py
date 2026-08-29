@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
 
 import pytest
 
 from core.osdev import providers_available, run_step, scan_serial
-from core.osdev.vm import VmSpec, boot_and_capture
+from core.osdev.vm import VmSpec, boot_and_capture, qemu_binary
 from core.tools import ToolCall, ToolContext, build_osdev_registry
 
 
@@ -83,8 +82,16 @@ async def test_osdev_make_image_tool(tmp_path):
     assert res.success and target.stat().st_size == 2 * 1024 * 1024
 
 
-@pytest.mark.skipif(shutil.which("qemu-system-x86_64") is None, reason="qemu-system-x86_64 not installed")
-async def test_real_qemu_boot_no_media_times_out_or_halts():
+async def test_boot_refuses_with_nothing_to_boot():
     res = await boot_and_capture(VmSpec(arch="x86_64", disk=None, iso=None, kernel=None, boot_timeout=8))
-    # nothing to boot -> adapter refuses before launching qemu
     assert not res.booted and "nothing to boot" in res.error
+
+
+@pytest.mark.skipif(qemu_binary("x86_64") is None, reason="qemu-system-x86_64 not installed")
+async def test_real_qemu_captures_serial_and_flags_no_boot(tmp_path):
+    img = tmp_path / "blank.img"
+    img.write_bytes(b"\0" * (1024 * 1024))
+    res = await boot_and_capture(VmSpec(arch="x86_64", disk=str(img), boot_timeout=25))
+    assert not res.booted
+    assert "SeaBIOS" in res.serial  # serial console really was captured
+    assert res.panic or res.timed_out  # unbootable disk -> flagged, not a false success

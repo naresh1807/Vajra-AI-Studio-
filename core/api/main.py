@@ -48,7 +48,11 @@ from core.api.schemas import (
     EditorOpenRequest,
     FileReadRequest,
     FileWriteRequest,
+    GitCheckpointRequest,
+    GitCommitRequest,
+    GitPathsRequest,
     GitRequest,
+    GitRestoreRequest,
     OpenProjectRequest,
     ProcStartRequest,
     ProcStopRequest,
@@ -63,9 +67,9 @@ from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
+from core.runtime import git as gitsvc
 from core.runtime import process_manager
 from core.tools import ToolContext
-from core.tools.git_tools import GitDiffTool, GitStatusTool
 from core.tools.process_tools import RunCommandTool
 from core.workspace import WorkspaceError, build_tree, discover_workspace, read_file, write_file
 from database import get_database
@@ -360,24 +364,77 @@ async def proc_stop(req: ProcStopRequest) -> SimpleOk:
     return SimpleOk(ok=ok, detail="stopped" if ok else "unknown process")
 
 
-# -- git --------------------------------------------------------
+# -- git / source control -------------------------------------
 @app.get("/api/git/status", dependencies=AUTH)
 async def git_status(root: str) -> dict:
-    result = await GitStatusTool().run(ToolContext(workspace_root=root))
-    return {"success": result.success, "stdout": result.stdout, "stderr": result.stderr}
+    st = await gitsvc.status(root)
+    return {
+        "is_repo": st.is_repo,
+        "branch": st.branch,
+        "ahead": st.ahead,
+        "behind": st.behind,
+        "files": [vars(f) for f in (st.files or [])],
+    }
 
 
 @app.get("/api/git/diff", dependencies=AUTH)
 async def git_diff(root: str, path: str | None = None, staged: bool = False) -> dict:
-    result = await GitDiffTool().run(
-        ToolContext(workspace_root=root), path=path or "", staged=staged
-    )
-    return {"success": result.success, "diff": result.stdout, "stderr": result.stderr}
+    try:
+        return {"diff": await gitsvc.diff(root, path, staged)}
+    except gitsvc.GitError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/api/git/diff", dependencies=AUTH)
-async def git_diff_post(req: GitRequest) -> dict:
-    return await git_diff(req.root, req.path, req.staged)
+@app.post("/api/git/stage", dependencies=AUTH)
+async def git_stage(req: GitPathsRequest) -> SimpleOk:
+    await gitsvc.stage(req.root, req.paths)
+    return SimpleOk()
+
+
+@app.post("/api/git/unstage", dependencies=AUTH)
+async def git_unstage(req: GitPathsRequest) -> SimpleOk:
+    await gitsvc.unstage(req.root, req.paths)
+    return SimpleOk()
+
+
+@app.post("/api/git/discard", dependencies=AUTH)
+async def git_discard(req: GitRequest) -> SimpleOk:
+    if not req.path:
+        raise HTTPException(400, "path required")
+    await gitsvc.discard(req.root, req.path)
+    return SimpleOk(detail=f"discarded {req.path}")
+
+
+@app.post("/api/git/commit", dependencies=AUTH)
+async def git_commit(req: GitCommitRequest) -> dict:
+    try:
+        sha = await gitsvc.commit(req.root, req.message)
+    except gitsvc.GitError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ok": True, "commit": sha}
+
+
+@app.get("/api/git/checkpoints", dependencies=AUTH)
+async def git_checkpoints(root: str) -> list[dict]:
+    return await gitsvc.checkpoints(root)
+
+
+@app.post("/api/git/checkpoint", dependencies=AUTH)
+async def git_make_checkpoint(req: GitCheckpointRequest) -> dict:
+    try:
+        return await gitsvc.checkpoint(req.root, req.label)
+    except gitsvc.GitError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/git/restore", dependencies=AUTH)
+async def git_restore(req: GitRestoreRequest) -> SimpleOk:
+    try:
+        await gitsvc.restore(req.root, req.target)
+    except gitsvc.GitError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    await events.record("report", note=f"restored to {req.target}")
+    return SimpleOk(detail=f"restored to {req.target}")
 
 
 # -- agent: chat --------------------------------------------------

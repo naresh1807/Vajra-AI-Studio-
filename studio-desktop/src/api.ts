@@ -136,13 +136,44 @@ export class Api {
   }
 
   gitStatus(root: string) {
-    return this.j<{ stdout: string; stderr: string }>(`/api/git/status?root=${encodeURIComponent(root)}`, {
-      headers: this.h(false),
-    });
+    return this.j<{
+      is_repo: boolean;
+      branch: string;
+      ahead: number;
+      behind: number;
+      files: Array<{ path: string; staged: boolean; unstaged: boolean; status: string }>;
+    }>(`/api/git/status?root=${encodeURIComponent(root)}`, { headers: this.h(false) });
   }
-  gitDiff(root: string, path?: string) {
-    const q = path ? `&path=${encodeURIComponent(path)}` : "";
+  gitDiff(root: string, path?: string, staged = false) {
+    const q = `${path ? `&path=${encodeURIComponent(path)}` : ""}${staged ? "&staged=true" : ""}`;
     return this.j<{ diff: string }>(`/api/git/diff?root=${encodeURIComponent(root)}${q}`, { headers: this.h(false) });
+  }
+  private gitPost<T = { ok: boolean }>(path: string, body: object) {
+    return this.j<T>(path, { method: "POST", headers: this.h(), body: JSON.stringify(body) });
+  }
+  gitStage(root: string, paths: string[]) {
+    return this.gitPost(`/api/git/stage`, { root, paths });
+  }
+  gitUnstage(root: string, paths: string[]) {
+    return this.gitPost(`/api/git/unstage`, { root, paths });
+  }
+  gitDiscard(root: string, path: string) {
+    return this.gitPost(`/api/git/discard`, { root, path });
+  }
+  gitCommit(root: string, message: string) {
+    return this.gitPost<{ ok: boolean; commit: string }>(`/api/git/commit`, { root, message });
+  }
+  gitCheckpoint(root: string, label: string) {
+    return this.gitPost<{ tag: string }>(`/api/git/checkpoint`, { root, label });
+  }
+  gitCheckpoints(root: string) {
+    return this.j<Array<{ tag: string; date: string; subject: string }>>(
+      `/api/git/checkpoints?root=${encodeURIComponent(root)}`,
+      { headers: this.h(false) },
+    ).catch(() => []);
+  }
+  gitRestore(root: string, target: string) {
+    return this.gitPost(`/api/git/restore`, { root, target });
   }
 
   assist(body: {

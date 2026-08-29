@@ -87,6 +87,26 @@ class GitRequest(BaseModel):
     staged: bool = False
 
 
+class GitPathsRequest(BaseModel):
+    root: str
+    paths: list[str] = []
+
+
+class GitCommitRequest(BaseModel):
+    root: str
+    message: str
+
+
+class GitRestoreRequest(BaseModel):
+    root: str
+    target: str
+
+
+class GitCheckpointRequest(BaseModel):
+    root: str
+    label: str = "manual checkpoint"
+
+
 # -- agent -----------------------------------------------------------
 class ChatMessageIn(BaseModel):
     role: str = "user"

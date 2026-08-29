@@ -6,6 +6,7 @@ import { BottomPanel } from "./BottomPanel";
 import { AgentPanel } from "./AgentPanel";
 import { DiffModal } from "./DiffModal";
 import { FolderPicker } from "./FolderPicker";
+import { GitPanel } from "./GitPanel";
 import { langFor } from "./monaco";
 
 async function tauriPickFolder(): Promise<string | null> {
@@ -38,6 +39,7 @@ export function App() {
   const [assisting, setAssisting] = useState(false);
   const [prose, setProse] = useState<{ title: string; text: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [leftTab, setLeftTab] = useState<"explorer" | "git">("explorer");
   const wsRef = useRef<WebSocket | null>(null);
 
   const refreshHealth = useCallback(async () => {
@@ -223,7 +225,21 @@ export function App() {
       </header>
 
       <div className="body">
-        <FileTree tree={tree} activePath={active} onOpen={openFile} onRefresh={() => root && loadTree(root)} />
+        <div className="left">
+          <div className="left-tabs">
+            <button className={leftTab === "explorer" ? "on" : ""} onClick={() => setLeftTab("explorer")}>
+              Explorer
+            </button>
+            <button className={leftTab === "git" ? "on" : ""} onClick={() => setLeftTab("git")}>
+              Source Control
+            </button>
+          </div>
+          {leftTab === "explorer" ? (
+            <FileTree tree={tree} activePath={active} onOpen={openFile} onRefresh={() => root && loadTree(root)} />
+          ) : (
+            <GitPanel api={api} root={root} onChanged={() => root && loadTree(root)} />
+          )}
+        </div>
         <div className="center">
           <EditorArea
             docs={docs}

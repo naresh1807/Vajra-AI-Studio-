@@ -83,7 +83,7 @@ llama.cpp). Swapping providers needs no agent-code changes.
 | 4 | Autonomous coding loop | ✅ plan → edit → test → debug → review → commit; verified greenfield + bug-fix |
 | 5 | Git + rollback | ✅ stage/commit/checkpoint/restore panel |
 | 6 | Computer agent | ✅ files/apps/PowerShell outside the workspace, approval-gated |
-| 7 | Android command/control | ✅ `GET /mobile` LAN page + Flutter scaffold |
+| 7 | Android command/control | ✅ `GET /mobile` LAN page + native APK (`scripts/build-apk.ps1`) |
 | 8 | Multi-language expansion | ✅ manifest-driven packs: +json/html/css/bash bundled, rust/go/clangd via PATH |
 | 9 | OS development agent | ✅ build → boot kernel/ISO in QEMU, capture serial, iterate |
 | 10 | Authorized security engineering | ✅ scope-gated: defensive audits + connect-only checks, no offense |

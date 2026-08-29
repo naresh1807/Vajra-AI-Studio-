@@ -37,12 +37,14 @@ Thumbs.db
 # sandbox (local scratch projects for testing Vajra)
 sandbox/
 
-# built installer
+# built artifacts
 VajraAI-Setup.exe
+VajraMobile.apk
 
-# Flutter
+# Flutter (the flutter_app/.gitignore + android/.gitignore handle the rest)
 mobile-android/flutter_app/.dart_tool/
 mobile-android/flutter_app/build/
 mobile-android/flutter_app/.flutter-plugins*
-mobile-android/flutter_app/android/
-mobile-android/flutter_app/ios/
+mobile-android/flutter_app/android/.gradle/
+mobile-android/flutter_app/android/local.properties
+mobile-android/flutter_app/**/*.iml

@@ -58,6 +58,7 @@ from core.api.schemas import (
     ProcStartRequest,
     ProcStopRequest,
     ProjectInfo,
+    SearchRequest,
     SimpleOk,
     TerminalRunRequest,
     TerminalRunResult,
@@ -74,7 +75,14 @@ from core.runtime import git as gitsvc
 from core.runtime import process_manager
 from core.tools import ToolContext
 from core.tools.process_tools import RunCommandTool
-from core.workspace import WorkspaceError, build_tree, discover_workspace, read_file, write_file
+from core.workspace import (
+    WorkspaceError,
+    build_tree,
+    discover_workspace,
+    read_file,
+    search_workspace,
+    write_file,
+)
 from database import get_database
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -253,6 +261,20 @@ async def workspace_tree(root: str, max_depth: int = 6) -> dict:
 @app.post("/api/workspace/tree", dependencies=AUTH)
 async def workspace_tree_post(req: TreeRequest) -> dict:
     return await workspace_tree(req.root, req.max_depth)
+
+
+@app.post("/api/workspace/search", dependencies=AUTH)
+async def workspace_search(req: SearchRequest) -> dict:
+    hits = await asyncio.to_thread(
+        search_workspace,
+        req.root,
+        req.query,
+        is_regex=req.is_regex,
+        case_sensitive=req.case_sensitive,
+        glob=req.glob or "*",
+        max_hits=req.max_hits,
+    )
+    return {"hits": [h.model_dump() for h in hits], "truncated": len(hits) >= req.max_hits}
 
 
 @app.post("/api/files/read", dependencies=AUTH)

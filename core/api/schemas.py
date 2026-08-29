@@ -27,6 +27,15 @@ class FileReadRequest(BaseModel):
     path: str
 
 
+class SearchRequest(BaseModel):
+    root: str
+    query: str
+    is_regex: bool = False
+    case_sensitive: bool = False
+    glob: str = "*"
+    max_hits: int = 400
+
+
 class FileWriteRequest(BaseModel):
     root: str
     path: str

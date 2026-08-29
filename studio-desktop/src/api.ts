@@ -87,6 +87,13 @@ export class Api {
     return this.j<FileNode>(`/api/workspace/tree?root=${encodeURIComponent(root)}`, { headers: this.h(false) });
   }
 
+  search(root: string, query: string, opts: { is_regex?: boolean; case_sensitive?: boolean; glob?: string } = {}) {
+    return this.j<{ hits: Array<{ path: string; line: number; text: string }>; truncated: boolean }>(
+      `/api/workspace/search`,
+      { method: "POST", headers: this.h(), body: JSON.stringify({ root, query, ...opts }) },
+    );
+  }
+
   readFile(root: string, path: string) {
     return this.j<{ path: string; content: string; bytes: number; truncated: boolean }>(`/api/files/read`, {
       method: "POST",

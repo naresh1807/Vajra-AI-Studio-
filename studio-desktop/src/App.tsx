@@ -7,7 +7,17 @@ import { AgentPanel } from "./AgentPanel";
 import { DiffModal } from "./DiffModal";
 import { FolderPicker } from "./FolderPicker";
 import { GitPanel } from "./GitPanel";
+import { SearchPanel } from "./SearchPanel";
+import { CommandPalette, Command } from "./CommandPalette";
 import { langFor } from "./monaco";
+
+function flattenFiles(node: FileNode | null, out: string[] = []): string[] {
+  for (const c of node?.children ?? []) {
+    if (c.type === "file") out.push(c.path);
+    else flattenFiles(c, out);
+  }
+  return out;
+}
 
 async function tauriPickFolder(): Promise<string | null> {
   const t = (window as any).__TAURI__;
@@ -39,7 +49,9 @@ export function App() {
   const [assisting, setAssisting] = useState(false);
   const [prose, setProse] = useState<{ title: string; text: string } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
-  const [leftTab, setLeftTab] = useState<"explorer" | "git">("explorer");
+  const [leftTab, setLeftTab] = useState<"explorer" | "git" | "search">("explorer");
+  const [palette, setPalette] = useState<"commands" | "files" | null>(null);
+  const [reveal, setReveal] = useState<{ path: string; line: number; n: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const refreshHealth = useCallback(async () => {
@@ -132,6 +144,15 @@ export function App() {
     setDocs((d) => d.map((x) => (x.path === path ? { ...x, content, dirty: true } : x)));
   }
 
+  const openFileAt = useCallback(
+    (path: string, line: number) => {
+      void openFile(path);
+      setReveal({ path, line, n: Date.now() });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [docs, root],
+  );
+
   const saveActive = useCallback(async () => {
     const doc = docs.find((d) => d.path === active);
     if (!doc || !doc.dirty || !root) return;
@@ -209,6 +230,46 @@ export function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const commands: Command[] = useMemo(
+    () => [
+      { id: "openFolder", label: "Open Folder…", run: openFolder },
+      { id: "save", label: "Save File", hint: "Ctrl+S", run: () => void saveActive() },
+      { id: "explorer", label: "View: Explorer", run: () => setLeftTab("explorer") },
+      { id: "search", label: "View: Search", hint: "Ctrl+Shift+F", run: () => setLeftTab("search") },
+      { id: "scm", label: "View: Source Control", run: () => setLeftTab("git") },
+      { id: "checkpoint", label: "Git: Create Checkpoint", run: () => root && api.gitCheckpoint(root, "manual").then(() => setToast("checkpoint created")) },
+      { id: "assist.fix", label: "Vajra: Fix (active file)", run: () => runAssist("fix", null) },
+      { id: "assist.refactor", label: "Vajra: Refactor (active file)", run: () => runAssist("refactor", null) },
+      { id: "assist.tests", label: "Vajra: Write Tests (active file)", run: () => runAssist("tests", null) },
+      { id: "assist.explain", label: "Vajra: Explain (active file)", run: () => runAssist("explain", null) },
+      { id: "assist.security", label: "Vajra: Security Review (active file)", run: () => runAssist("security", null) },
+      { id: "settings", label: "Open Settings", run: () => setShowSettings(true) },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [root, api, saveActive, runAssist],
+  );
+
+  const fileList = useMemo(() => flattenFiles(tree), [tree]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && (e.key === "P" || e.key === "p")) {
+        e.preventDefault();
+        setPalette("commands");
+      } else if (e.ctrlKey && !e.shiftKey && (e.key === "P" || e.key === "p")) {
+        e.preventDefault();
+        setPalette("files");
+      } else if (e.ctrlKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
+        e.preventDefault();
+        setLeftTab("search");
+      } else if (e.key === "Escape") {
+        setPalette(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="studio">
       <header className="topbar">
@@ -230,15 +291,18 @@ export function App() {
             <button className={leftTab === "explorer" ? "on" : ""} onClick={() => setLeftTab("explorer")}>
               Explorer
             </button>
+            <button className={leftTab === "search" ? "on" : ""} onClick={() => setLeftTab("search")}>
+              Search
+            </button>
             <button className={leftTab === "git" ? "on" : ""} onClick={() => setLeftTab("git")}>
               Source Control
             </button>
           </div>
-          {leftTab === "explorer" ? (
+          {leftTab === "explorer" && (
             <FileTree tree={tree} activePath={active} onOpen={openFile} onRefresh={() => root && loadTree(root)} />
-          ) : (
-            <GitPanel api={api} root={root} onChanged={() => root && loadTree(root)} />
           )}
+          {leftTab === "git" && <GitPanel api={api} root={root} onChanged={() => root && loadTree(root)} />}
+          {leftTab === "search" && <SearchPanel api={api} root={root} onOpen={openFileAt} />}
         </div>
         <div className="center">
           <EditorArea
@@ -250,7 +314,8 @@ export function App() {
             onSave={saveActive}
             onAssist={runAssist}
             lspCtx={() => (root ? { api, root } : null)}
-            onOpenPath={(p) => openFile(p)}
+            onOpenPath={openFileAt}
+            reveal={reveal}
           />
           <BottomPanel api={api} root={root} events={events} />
         </div>
@@ -267,6 +332,16 @@ export function App() {
           title={pendingDiff.title}
           onAccept={acceptDiff}
           onReject={() => setPendingDiff(null)}
+        />
+      )}
+
+      {palette && (
+        <CommandPalette
+          mode={palette}
+          commands={commands}
+          files={fileList}
+          onClose={() => setPalette(null)}
+          onPickFile={(p) => openFile(p)}
         />
       )}
 

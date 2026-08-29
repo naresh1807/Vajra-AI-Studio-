@@ -31,6 +31,7 @@ export function EditorArea({
   onAssist,
   lspCtx,
   onOpenPath,
+  reveal,
 }: {
   docs: OpenDoc[];
   active: string | null;
@@ -41,6 +42,7 @@ export function EditorArea({
   onAssist: (action: AssistAction, selection: string | null, instruction?: string) => void;
   lspCtx: () => LspCtx | null;
   onOpenPath: (path: string, line: number) => void;
+  reveal: { path: string; line: number; n: number } | null;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -132,6 +134,18 @@ export function EditorArea({
     editor.current.setModel(model);
     editor.current.focus();
   }, [active, docs]);
+
+  // reveal a line (from search / go-to-definition)
+  useEffect(() => {
+    if (!reveal || !editor.current || active !== reveal.path) return;
+    const ed = editor.current;
+    const t = setTimeout(() => {
+      ed.revealLineInCenter(reveal.line);
+      ed.setPosition({ lineNumber: reveal.line, column: 1 });
+      ed.focus();
+    }, 60);
+    return () => clearTimeout(t);
+  }, [reveal, active]);
 
   // drop models for closed docs
   useEffect(() => {

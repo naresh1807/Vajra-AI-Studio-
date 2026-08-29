@@ -8,7 +8,9 @@ roll back (manual v3.0 sections 6 and 26).
 from __future__ import annotations
 
 import difflib
+import fnmatch
 import os
+import re
 import time
 from pathlib import Path
 
@@ -101,6 +103,55 @@ def build_tree(root: str | Path, max_depth: int = 6) -> FileNode:
         return nodes
 
     return FileNode(name=base.name, path="", type="dir", children=walk(base, 1))
+
+
+class SearchHit(BaseModel):
+    path: str
+    line: int
+    text: str
+
+
+def _iter_files(base: Path):
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if d not in _IGNORE_DIRS and not d.startswith(".git")]
+        for fn in filenames:
+            yield Path(dirpath) / fn
+
+
+def search_workspace(
+    root: str | Path,
+    query: str,
+    *,
+    is_regex: bool = False,
+    case_sensitive: bool = False,
+    glob: str = "*",
+    max_hits: int = 400,
+) -> list[SearchHit]:
+    base = Path(root).resolve()
+    if not query:
+        return []
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        rx = re.compile(query if is_regex else re.escape(query), flags)
+    except re.error:
+        return []
+    hits: list[SearchHit] = []
+    for full in _iter_files(base):
+        if not fnmatch.fnmatch(full.name, glob):
+            continue
+        try:
+            if full.stat().st_size > 2_000_000:
+                continue
+            with full.open(encoding="utf-8", errors="ignore") as fh:
+                for i, line in enumerate(fh, 1):
+                    if rx.search(line):
+                        rel = str(full.relative_to(base)).replace(os.sep, "/")
+                        hits.append(SearchHit(path=rel, line=i, text=line.rstrip()[:300]))
+                        if len(hits) >= max_hits:
+                            return hits
+        except OSError:
+            continue
+    return hits
 
 
 def read_file(root: str | Path, rel: str) -> FileContent:

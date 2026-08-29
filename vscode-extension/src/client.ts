@@ -1,9 +1,9 @@
-/** Thin client for the Vajra Local API. Uses the extension host's global fetch. */
+/** Thin client for the Vajra Local API (manual v3.0 route map). Uses the extension host's global fetch. */
 import * as vscode from "vscode";
 
-export interface GoalStatus {
+export interface RunStatus {
   id: string;
-  text: string;
+  goal: string;
   status: string;
   progress: Record<string, number>;
   tasks: Array<Record<string, unknown>>;
@@ -22,13 +22,13 @@ export class VajraClient {
   }
 
   async health(): Promise<{ status: string; models: Record<string, string> }> {
-    const r = await fetch(`${this.base()}/health`);
+    const r = await fetch(`${this.base()}/api/health`);
     if (!r.ok) throw new Error(`Core not reachable (${r.status})`);
     return r.json() as Promise<{ status: string; models: Record<string, string> }>;
   }
 
   async chat(message: string): Promise<string> {
-    const r = await fetch(`${this.base()}/api/v1/chat`, {
+    const r = await fetch(`${this.base()}/api/agent/chat`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ message }),
@@ -38,7 +38,7 @@ export class VajraClient {
   }
 
   async openProject(rootPath: string): Promise<{ id: string }> {
-    const r = await fetch(`${this.base()}/api/v1/projects/open`, {
+    const r = await fetch(`${this.base()}/api/projects`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ root_path: rootPath }),
@@ -47,37 +47,38 @@ export class VajraClient {
     return r.json() as Promise<{ id: string }>;
   }
 
-  async createGoal(text: string, workspaceRoot: string): Promise<GoalStatus> {
-    const r = await fetch(`${this.base()}/api/v1/goals`, {
+  async startRun(goal: string, workspaceRoot: string): Promise<RunStatus> {
+    const r = await fetch(`${this.base()}/api/agent/run`, {
       method: "POST",
       headers: this.headers(),
-      body: JSON.stringify({ text, workspace_root: workspaceRoot, autostart: true }),
+      body: JSON.stringify({ goal, workspace_root: workspaceRoot, autostart: true }),
     });
     if (!r.ok) throw new Error(await r.text());
-    return r.json() as Promise<GoalStatus>;
+    return r.json() as Promise<RunStatus>;
   }
 
-  async goalStatus(goalId: string): Promise<GoalStatus> {
-    const r = await fetch(`${this.base()}/api/v1/goals/${goalId}`, { headers: this.headers() });
+  async runStatus(runId: string): Promise<RunStatus> {
+    const r = await fetch(`${this.base()}/api/agent/runs/${runId}`, { headers: this.headers() });
     if (!r.ok) throw new Error(await r.text());
-    return r.json() as Promise<GoalStatus>;
+    return r.json() as Promise<RunStatus>;
   }
 
-  async cancelGoal(goalId: string): Promise<void> {
-    await fetch(`${this.base()}/api/v1/tasks/${goalId}/cancel`, {
+  async stopRun(runId: string): Promise<void> {
+    await fetch(`${this.base()}/api/agent/stop`, {
       method: "POST",
       headers: this.headers(),
+      body: JSON.stringify({ run_id: runId }),
     });
   }
 
   async listApprovals(): Promise<Array<{ id: string; tool_name: string; reason: string }>> {
-    const r = await fetch(`${this.base()}/api/v1/approvals`, { headers: this.headers() });
+    const r = await fetch(`${this.base()}/api/approvals`, { headers: this.headers() });
     if (!r.ok) return [];
     return r.json() as Promise<Array<{ id: string; tool_name: string; reason: string }>>;
   }
 
   async resolveApproval(approvalId: string, verdict: "approved" | "rejected"): Promise<void> {
-    await fetch(`${this.base()}/api/v1/tools/approve`, {
+    await fetch(`${this.base()}/api/approvals`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ approval_id: approvalId, verdict }),

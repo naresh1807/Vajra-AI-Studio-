@@ -1,7 +1,7 @@
 /** Chat / Task webview. Supplies editor context to the local Vajra backend and
  *  streams task progress by polling the goal status endpoint. */
 import * as vscode from "vscode";
-import { VajraClient, GoalStatus } from "./client";
+import { VajraClient, RunStatus } from "./client";
 
 export class VajraPanel implements vscode.WebviewViewProvider {
   public static readonly viewId = "vajra.chat";
@@ -62,7 +62,7 @@ export class VajraPanel implements vscode.WebviewViewProvider {
     } else if (msg.type === "autonomous") {
       await this.startAutonomous(msg.text);
     } else if (msg.type === "cancel" && msg.goalId) {
-      await this.client.cancelGoal(msg.goalId);
+      await this.client.stopRun(msg.goalId);
     } else if (msg.type === "approve") {
       await this.client.resolveApproval(msg.approvalId, msg.verdict);
     }
@@ -77,9 +77,9 @@ export class VajraPanel implements vscode.WebviewViewProvider {
     try {
       await this.client.openProject(root);
       const ctx = this.editorContext();
-      const goal = await this.client.createGoal(ctx ? `${text}\n\nContext:\n${ctx}` : text, root);
-      this.post({ type: "goalStarted", goal });
-      this.startPolling(goal.id);
+      const run = await this.client.startRun(ctx ? `${text}\n\nContext:\n${ctx}` : text, root);
+      this.post({ type: "goalStarted", goal: run });
+      this.startPolling(run.id);
     } catch (e) {
       this.post({ type: "error", text: String(e) });
     }
@@ -89,7 +89,7 @@ export class VajraPanel implements vscode.WebviewViewProvider {
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = setInterval(async () => {
       try {
-        const status: GoalStatus = await this.client.goalStatus(goalId);
+        const status: RunStatus = await this.client.runStatus(goalId);
         const approvals = await this.client.listApprovals();
         this.post({ type: "goalUpdate", status, approvals });
         if (["passed", "failed"].includes(status.status)) {

@@ -33,28 +33,67 @@ def client(monkeypatch, tmp_path):
 
 def test_health_no_auth(client):
     c, _ = client
-    r = c.get("/health")
+    r = c.get("/api/health")
     assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
 def test_ping_requires_token(client):
     c, token = client
-    assert c.get("/api/v1/ping").status_code == 401
-    assert c.get("/api/v1/ping", headers={"X-Vajra-Token": token}).status_code == 200
+    assert c.get("/api/ping").status_code == 401
+    assert c.get("/api/ping", headers={"X-Vajra-Token": token}).status_code == 200
 
 
 def test_open_project_and_context(client, tmp_workspace):
     c, token = client
     h = {"X-Vajra-Token": token}
-    r = c.post("/api/v1/projects/open", json={"root_path": str(tmp_workspace)}, headers=h)
+    r = c.post("/api/projects", json={"root_path": str(tmp_workspace)}, headers=h)
     assert r.status_code == 200
     pid = r.json()["id"]
-    ctx = c.get(f"/api/v1/projects/{pid}/context", headers=h)
+    ctx = c.get(f"/api/projects/{pid}/context", headers=h)
     assert ctx.status_code == 200
     assert "python" in ctx.json()["profile"]["languages"]
 
 
-def test_chat(client):
+def test_workspace_tree(client, tmp_workspace):
     c, token = client
-    r = c.post("/api/v1/chat", json={"message": "hi"}, headers={"X-Vajra-Token": token})
+    r = c.get("/api/workspace/tree", params={"root": str(tmp_workspace)}, headers={"X-Vajra-Token": token})
+    assert r.status_code == 200
+    names = [n["name"] for n in r.json()["children"]]
+    assert "src" in names and "pyproject.toml" in names
+
+
+def test_files_read_write_roundtrip(client, tmp_workspace):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    w = c.post("/api/files/write", json={"root": str(tmp_workspace), "path": "notes/a.txt", "content": "hi"}, headers=h)
+    assert w.status_code == 200 and w.json()["created"] is True
+    r = c.post("/api/files/read", json={"root": str(tmp_workspace), "path": "notes/a.txt"}, headers=h)
+    assert r.json()["content"] == "hi"
+
+
+def test_files_write_rejects_escape(client, tmp_workspace):
+    c, token = client
+    r = c.post(
+        "/api/files/write",
+        json={"root": str(tmp_workspace), "path": "../evil.txt", "content": "x"},
+        headers={"X-Vajra-Token": token},
+    )
+    assert r.status_code == 400
+
+
+def test_terminal_run(client, tmp_workspace):
+    c, token = client
+    r = c.post(
+        "/api/terminal/run",
+        json={"root": str(tmp_workspace), "command": ["python", "-c", "print(6*7)"]},
+        headers={"X-Vajra-Token": token},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["exit_code"] == 0 and body["stdout"].strip() == "42"
+
+
+def test_agent_chat(client):
+    c, token = client
+    r = c.post("/api/agent/chat", json={"message": "hi"}, headers={"X-Vajra-Token": token})
     assert r.status_code == 200 and r.json()["reply"] == "stub reply"

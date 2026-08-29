@@ -15,22 +15,52 @@ class ProjectInfo(BaseModel):
     profile: dict = {}
 
 
-class CreateGoalRequest(BaseModel):
-    text: str = Field(min_length=1)
-    project_id: str | None = None
-    workspace_root: str | None = None
-    autostart: bool = True
+# -- files / workspace ---------------------------------------------------
+class TreeRequest(BaseModel):
+    root: str
+    max_depth: int = 6
 
 
-class GoalStatus(BaseModel):
-    id: str
-    text: str
-    status: str
-    progress: dict[str, int] = {}
-    tasks: list[dict] = []
-    changed_files: list[str] = []
+class FileReadRequest(BaseModel):
+    root: str
+    path: str
 
 
+class FileWriteRequest(BaseModel):
+    root: str
+    path: str
+    content: str
+
+
+class EditorOpenRequest(BaseModel):
+    root: str
+    path: str
+
+
+# -- terminal ----------------------------------------------------------
+class TerminalRunRequest(BaseModel):
+    root: str
+    command: list[str] | str
+    timeout_seconds: int = 300
+
+
+class TerminalRunResult(BaseModel):
+    stdout: str
+    stderr: str
+    exit_code: int | None
+    duration_ms: int
+    cwd: str
+    command: list[str]
+
+
+# -- git -------------------------------------------------------------
+class GitRequest(BaseModel):
+    root: str
+    path: str | None = None
+    staged: bool = False
+
+
+# -- agent -----------------------------------------------------------
 class ChatMessageIn(BaseModel):
     role: str = "user"
     content: str
@@ -40,13 +70,33 @@ class ChatRequest(BaseModel):
     message: str
     history: list[ChatMessageIn] = []
     workspace_root: str | None = None
-    goal_id: str | None = None
+    run_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     reply: str
     tool_calls: list[dict] = []
     model: dict[str, str] = {}
+
+
+class AgentRunRequest(BaseModel):
+    goal: str = Field(min_length=1)
+    workspace_root: str | None = None
+    project_id: str | None = None
+    autostart: bool = True
+
+
+class AgentRunStatus(BaseModel):
+    id: str
+    goal: str
+    status: str
+    progress: dict[str, int] = {}
+    tasks: list[dict] = []
+    changed_files: list[str] = []
+
+
+class AgentStopRequest(BaseModel):
+    run_id: str
 
 
 class ApproveRequest(BaseModel):

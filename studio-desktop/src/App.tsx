@@ -381,6 +381,18 @@ export function App() {
         </button>
       </header>
 
+      {!core.ok && !showSettings && (
+        <div className="offline-banner">
+          <b>Vajra Core is offline.</b> Start it:
+          <code onClick={() => navigator.clipboard?.writeText("vajra-api")}>vajra-api</code>
+          <span className="muted">(or&nbsp;</span>
+          <code onClick={() => navigator.clipboard?.writeText("pwsh -File scripts/dev.ps1")}>
+            pwsh -File scripts/dev.ps1
+          </code>
+          <span className="muted">). Click to copy · retrying…</span>
+        </div>
+      )}
+
       <div className="body">
         <div className="left">
           <div className="left-tabs">

@@ -368,6 +368,26 @@ export class Api {
     return this.j<{ qemu: Record<string, boolean> }>(`/api/osdev/providers`, { headers: this.h(false) });
   }
 
+  securityRun(instruction: string, root: string) {
+    return this.j<{ id: string; status: string }>(`/api/security/run`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ instruction, root }),
+    });
+  }
+  securityRunStatus(id: string) {
+    return this.j<{ id: string; status: string; reply: string; actions: Array<{ tool: string; success: boolean }> }>(
+      `/api/security/runs/${id}`,
+      { headers: this.h(false) },
+    );
+  }
+  securityScopes(root: string) {
+    return this.j<{ scopes: Array<{ name: string; authorized_targets: string[]; techniques: string[]; expires_at: number }> }>(
+      `/api/security/scopes?root=${encodeURIComponent(root)}`,
+      { headers: this.h(false) },
+    );
+  }
+
   approvals() {
     return this.j<Array<{ id: string; tool_name: string; reason: string }>>(`/api/approvals`, {
       headers: this.h(false),

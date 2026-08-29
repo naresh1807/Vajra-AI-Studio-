@@ -14,9 +14,9 @@ export function AgentPanel({
   root: string | null;
   onFilesChanged: () => void;
 }) {
-  const [mode, setMode] = useState<"chat" | "agent" | "computer" | "osdev">("chat");
+  const [mode, setMode] = useState<"chat" | "agent" | "computer" | "osdev" | "security">("chat");
   const [cmpRun, setCmpRun] = useState<{ id: string; status: string } | null>(null);
-  const [cmpKind, setCmpKind] = useState<"computer" | "osdev">("computer");
+  const [cmpKind, setCmpKind] = useState<"computer" | "osdev" | "security">("computer");
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,12 @@ export function AgentPanel({
     if (!cmpRun || ["passed", "failed"].includes(cmpRun.status)) return;
     const t = setInterval(async () => {
       try {
-        const s = cmpKind === "osdev" ? await api.osdevRunStatus(cmpRun.id) : await api.computerRunStatus(cmpRun.id);
+        const s =
+          cmpKind === "osdev"
+            ? await api.osdevRunStatus(cmpRun.id)
+            : cmpKind === "security"
+              ? await api.securityRunStatus(cmpRun.id)
+              : await api.computerRunStatus(cmpRun.id);
         setApprovals(await api.approvals());
         if (["passed", "failed"].includes(s.status)) {
           setCmpRun(s);
@@ -95,15 +100,29 @@ export function AgentPanel({
         const r = await api.chat(text, history(), root ?? undefined);
         for (const tc of r.tool_calls || []) setBubbles((b) => [...b, { kind: "tool", text: tc.tool, ok: tc.success }]);
         setBubbles((b) => [...b, { kind: "assistant", text: r.reply || "(no reply)" }]);
-      } else if (mode === "computer" || mode === "osdev") {
-        const s = mode === "osdev" ? await api.osdevRun(text) : await api.computerRun(text);
-        setCmpKind(mode === "osdev" ? "osdev" : "computer");
+      } else if (mode === "computer" || mode === "osdev" || mode === "security") {
+        if (mode === "security" && !root) {
+          setBubbles((b) => [...b, { kind: "system", text: "Open the project folder first." }]);
+          return;
+        }
+        const s =
+          mode === "osdev"
+            ? await api.osdevRun(text)
+            : mode === "security"
+              ? await api.securityRun(text, root as string)
+              : await api.computerRun(text);
+        setCmpKind(mode);
         setCmpRun(s);
         setBubbles((b) => [
           ...b,
           {
             kind: "system",
-            text: mode === "osdev" ? "OS-dev run started — build → boot → inspect." : "Computer task running — approve any prompts below.",
+            text:
+              mode === "osdev"
+                ? "OS-dev run started — build → boot → inspect."
+                : mode === "security"
+                  ? "Security run started — defensive audits; active checks need an authorized scope + approval."
+                  : "Computer task running — approve any prompts below.",
           },
         ]);
         return; // keep busy; the poller clears it
@@ -140,6 +159,9 @@ export function AgentPanel({
           <button className={mode === "osdev" ? "on" : ""} onClick={() => setMode("osdev")}>
             OS Dev
           </button>
+          <button className={mode === "security" ? "on" : ""} onClick={() => setMode("security")}>
+            Security
+          </button>
         </div>
       </div>
 
@@ -152,7 +174,9 @@ export function AgentPanel({
                 ? "Computer tasks outside the project: create/find files anywhere, open apps, run local workflows. Mutating steps ask for approval."
                 : mode === "osdev"
                   ? "Build and boot a kernel / bootloader / OS: Vajra runs the toolchain, boots the artifact in QEMU, reads the serial log, and iterates. Needs qemu-system-* + a cross-toolchain on PATH."
-                  : "Describe a task. Vajra will plan → edit → test → review."}
+                  : mode === "security"
+                    ? "Defensive security for this project: dependency / secret / config audits. Active checks (port scan, HTTP audit) only run against a target listed in an authorized scope profile, and pause for approval."
+                    : "Describe a task. Vajra will plan → edit → test → review."}
           </div>
         )}
         {bubbles.map((b, i) =>

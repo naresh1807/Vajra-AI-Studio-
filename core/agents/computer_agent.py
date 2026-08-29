@@ -56,9 +56,12 @@ class ComputerAgent:
         self.system_prompt = _SYSTEM
         self.kind = "computer"
         self.max_turns = _MAX_TURNS
+        #: subclasses that need project context (e.g. security audits) set this
+        #: before a run; the computer agent itself acts outside any workspace.
+        self.workspace_root = ""
 
     async def run(self, run_id: str, instruction: str) -> ComputerResult:
-        ctx = ToolContext(workspace_root="", goal_id=run_id)
+        ctx = ToolContext(workspace_root=self.workspace_root, goal_id=run_id)
         history: list[ChatMessage] = [
             ChatMessage(role="system", content=self.system_prompt),
             ChatMessage(role="user", content=instruction),

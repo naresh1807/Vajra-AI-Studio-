@@ -169,3 +169,23 @@ def build_osdev_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         tool.system = True
         registry.register(tool)
     return registry
+
+
+def build_security_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
+    """Registry for the authorized-security agent: defensive audits (no scope,
+    no network) plus scope-gated, approval-gated active checks."""
+    from core.tools import security_tools as st
+
+    registry = ToolRegistry(policy or PolicyEngine())
+    for tool_cls in (
+        st.SecurityScopesTool,
+        st.DependencyAuditTool,
+        st.SecretScanTool,
+        st.ConfigAuditTool,
+    ):
+        registry.register(tool_cls())
+    for tool_cls in (st.PortScanTool, st.HttpAuditTool):
+        tool = tool_cls()
+        tool.system = True
+        registry.register(tool)
+    return registry

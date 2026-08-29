@@ -40,6 +40,7 @@ from core.agents.chat_agent import ChatAgent
 from core.agents.complete_agent import CompletionAgent
 from core.agents.computer_agent import ComputerAgent
 from core.agents.osdev_agent import OsDevAgent
+from core.agents.security_agent import SecurityAgent
 from core.api.schemas import (
     AgentRunRequest,
     AgentRunStatus,
@@ -71,6 +72,8 @@ from core.api.schemas import (
     ProcStopRequest,
     ProjectInfo,
     SearchRequest,
+    SecurityRunRequest,
+    SecurityScopeIn,
     SimpleOk,
     TerminalRunRequest,
     TerminalRunResult,
@@ -136,10 +139,12 @@ assist_agent = AssistAgent(router)
 completion_agent = CompletionAgent(router)
 computer_agent = ComputerAgent(router, approvals, events)
 osdev_agent = OsDevAgent(router, approvals, events)
+security_agent = SecurityAgent(router, approvals, events)
 db = get_database()
 _running: dict[str, asyncio.Task] = {}
 _computer_runs: dict[str, dict] = {}
 _osdev_runs: dict[str, dict] = {}
+_security_runs: dict[str, dict] = {}
 
 
 async def _persist_events() -> None:
@@ -699,6 +704,62 @@ async def osdev_run_status(run_id: str) -> ComputerRunResult:
     data = _osdev_runs.get(run_id)
     if not data:
         raise HTTPException(404, "unknown osdev run")
+    return ComputerRunResult(
+        id=run_id, status=data.get("status", "running"), reply=data.get("reply", ""),
+        actions=data.get("actions", []), succeeded=data.get("status") == "passed",
+    )
+
+
+# -- authorized-security agent (defensive audits + scoped active checks) --
+@app.get("/api/security/scopes", dependencies=AUTH)
+async def security_scopes(root: str) -> dict:
+    from core.security.scope import ScopeStore
+
+    return {"scopes": [s.to_dict() for s in ScopeStore(root).list()]}
+
+
+@app.post("/api/security/scopes", dependencies=AUTH)
+async def security_scope_save(req: SecurityScopeIn) -> dict:
+    from core.security.scope import ScopeProfile, ScopeStore
+
+    if not req.root:
+        raise HTTPException(400, "root is required")
+    profile = ScopeProfile(
+        name=req.name, authorized_targets=req.authorized_targets,
+        authorized_ports=req.authorized_ports, techniques=req.techniques,
+        authorization_ref=req.authorization_ref, expires_at=req.expires_at, notes=req.notes,
+    )
+    path = ScopeStore(req.root).save(profile)
+    await events.record("report", note=f"security scope '{req.name}' saved")
+    return {"saved": str(path), "scope": profile.to_dict()}
+
+
+async def _run_security(run_id: str, instruction: str) -> None:
+    _security_runs[run_id] = {"id": run_id, "status": "running", "reply": "", "actions": []}
+    try:
+        res = await security_agent.run(run_id, instruction)
+        _security_runs[run_id] = {
+            "id": run_id, "status": "passed" if res.succeeded else "failed",
+            "reply": res.reply, "actions": res.actions,
+        }
+    except Exception as exc:  # noqa: BLE001
+        log.exception("security run %s crashed", run_id)
+        _security_runs[run_id] = {"id": run_id, "status": "failed", "reply": str(exc), "actions": []}
+
+
+@app.post("/api/security/run", dependencies=AUTH)
+async def security_run(req: SecurityRunRequest) -> dict:
+    run_id = f"sec-{len(_security_runs) + 1}-{id(req) % 100000}"
+    security_agent.workspace_root = req.root or ""
+    _running[run_id] = asyncio.create_task(_run_security(run_id, req.instruction))
+    return {"id": run_id, "status": "running"}
+
+
+@app.get("/api/security/runs/{run_id}", dependencies=AUTH)
+async def security_run_status(run_id: str) -> ComputerRunResult:
+    data = _security_runs.get(run_id)
+    if not data:
+        raise HTTPException(404, "unknown security run")
     return ComputerRunResult(
         id=run_id, status=data.get("status", "running"), reply=data.get("reply", ""),
         actions=data.get("actions", []), succeeded=data.get("status") == "passed",

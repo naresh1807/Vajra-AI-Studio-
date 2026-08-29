@@ -4,6 +4,7 @@ from core.tools.registry import (
     build_computer_registry,
     build_default_registry,
     build_osdev_registry,
+    build_security_registry,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "build_computer_registry",
     "build_default_registry",
     "build_osdev_registry",
+    "build_security_registry",
 ]

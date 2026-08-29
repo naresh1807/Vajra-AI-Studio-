@@ -124,6 +124,21 @@ def test_osdev_providers_route(client):
     assert r.status_code == 200 and "x86_64" in r.json()["qemu"]
 
 
+def test_security_scope_save_and_list(client, tmp_workspace):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    assert c.get("/api/security/scopes", params={"root": str(tmp_workspace)}).status_code == 401
+    save = c.post(
+        "/api/security/scopes",
+        json={"name": "eng1", "root": str(tmp_workspace), "authorized_targets": ["127.0.0.1"],
+              "techniques": ["port-scan"]},
+        headers=h,
+    )
+    assert save.status_code == 200
+    lst = c.get("/api/security/scopes", params={"root": str(tmp_workspace)}, headers=h)
+    assert lst.status_code == 200 and lst.json()["scopes"][0]["name"] == "eng1"
+
+
 def test_mobile_page_served_unauthenticated(client):
     c, _ = client
     r = c.get("/mobile")

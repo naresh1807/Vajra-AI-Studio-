@@ -216,6 +216,22 @@ class ComputerRunResult(BaseModel):
     succeeded: bool = True
 
 
+class SecurityRunRequest(BaseModel):
+    instruction: str = Field(min_length=1)
+    root: str = ""
+
+
+class SecurityScopeIn(BaseModel):
+    name: str = Field(min_length=1)
+    root: str = ""
+    authorized_targets: list[str] = []
+    authorized_ports: list[int] = []
+    techniques: list[str] = []
+    authorization_ref: str = ""
+    expires_at: float = 0.0
+    notes: str = ""
+
+
 class ApproveRequest(BaseModel):
     approval_id: str
     verdict: str = "approved"

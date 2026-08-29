@@ -11,8 +11,10 @@ executables); packs may instead name a ``command`` resolved from PATH.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from functools import lru_cache
+from pathlib import Path
 
 from core.config import REPO_ROOT
 
@@ -20,6 +22,30 @@ _ROOT = REPO_ROOT / "extensions" / "language-servers"
 _NM = _ROOT / "node_modules"
 _MANIFEST = _ROOT / "servers.json"
 _NODE = shutil.which("node")
+
+# Toolchain bin dirs that are often not on a GUI-launched process's PATH.
+_EXTRA_BIN_DIRS = [
+    Path.home() / ".cargo" / "bin",
+    Path.home() / "go" / "bin",
+    Path.home() / ".local" / "bin",
+    Path("C:/Program Files/Go/bin"),
+    Path("C:/Program Files/LLVM/bin"),
+    Path("C:/Program Files/qemu"),
+]
+
+
+def _which(name: str) -> str | None:
+    """PATH lookup, then well-known toolchain locations."""
+    found = shutil.which(name)
+    if found:
+        return found
+    exts = ("", ".exe", ".cmd", ".bat") if os.name == "nt" else ("",)
+    for d in _EXTRA_BIN_DIRS:
+        for ext in exts:
+            cand = d / f"{name}{ext}"
+            if cand.is_file():
+                return str(cand)
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -48,7 +74,7 @@ def _argv(pack: dict) -> list[str] | None:
             return None
         return [_NODE, str(entry), *args]
     if "command" in pack:
-        exe = shutil.which(pack["command"])
+        exe = _which(pack["command"])
         return [exe, *args] if exe else None
     return None
 

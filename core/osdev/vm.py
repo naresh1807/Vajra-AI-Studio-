@@ -63,8 +63,24 @@ class BootResult:
     error: str = ""
 
 
+_QEMU_DIRS = (
+    Path("C:/Program Files/qemu"),
+    Path("C:/Program Files (x86)/qemu"),
+    Path.home() / "scoop" / "apps" / "qemu" / "current",
+)
+
+
 def qemu_binary(arch: str) -> str | None:
-    return shutil.which(f"qemu-system-{arch}")
+    name = f"qemu-system-{arch}"
+    found = shutil.which(name)
+    if found:
+        return found
+    for d in _QEMU_DIRS:
+        for ext in ("", ".exe"):
+            cand = d / f"{name}{ext}"
+            if cand.is_file():
+                return str(cand)
+    return None
 
 
 def providers_available() -> dict[str, bool]:

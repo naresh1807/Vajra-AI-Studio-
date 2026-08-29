@@ -33,10 +33,14 @@ requirement for the native helper modules via `Directory.Build.targets`.)
 
 ```powershell
 cd studio
-scripts\bootstrap.ps1 -Tag 1.135.0     # pick the latest stable tag from github.com/microsoft/vscode/tags
-scripts\build.ps1                      # ~30-45 min first time
-.\VajraAIStudio-win32-x64\VajraAIStudio.exe
+scripts\bootstrap.ps1 -Tag 1.135.0     # clone + rebrand + bundle extension + npm ci  (~20 min)
+scripts\build.ps1                      # gulp compile  (~25-45 min)
+.\VajraAIStudio-win32-x64\"Vajra AI Studio.exe"
 ```
+
+**Gotcha:** if `ELECTRON_RUN_AS_NODE` is set in your shell, the `.exe` runs as
+plain Node and rejects every flag (`bad option: --user-data-dir`). `Remove-Item
+env:ELECTRON_RUN_AS_NODE` first. The `bin\vajra-studio.cmd` CLI is unaffected.
 
 Dev run (no packaging): `cd studio\vscode ; .\scripts\code.bat`
 

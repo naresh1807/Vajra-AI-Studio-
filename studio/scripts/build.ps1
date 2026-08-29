@@ -20,10 +20,10 @@ if ($LASTEXITCODE -ne 0) { throw "gulp build failed" }
 
 $out = Join-Path $buildDir "VSCode-win32-x64"
 $target = Join-Path $studio "VajraAIStudio-win32-x64"
-if (Test-Path $out) {
-  if (Test-Path $target) { Remove-Item -Recurse -Force $target }
-  Move-Item $out $target
-  Write-Host "`n-> $target\VajraAIStudio.exe" -ForegroundColor Green
-} else {
-  throw "expected build output at $out"
-}
+if (-not (Test-Path $out)) { throw "expected build output at $out" }
+if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+Move-Item $out $target
+$exe = Get-ChildItem $target -Filter "*.exe" | Where-Object { $_.Name -notlike "*Crash*" } | Select-Object -First 1
+Write-Host "`n-> `"$($exe.FullName)`"" -ForegroundColor Green
+Write-Host "   run it, or:  `"$target\bin\vajra-studio.cmd`" <folder>"
+Write-Host "   NOTE: unset ELECTRON_RUN_AS_NODE in your shell first, or the exe runs as plain node."

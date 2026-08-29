@@ -115,3 +115,10 @@ def test_agent_chat(client):
     c, token = client
     r = c.post("/api/agent/chat", json={"message": "hi"}, headers={"X-Vajra-Token": token})
     assert r.status_code == 200 and r.json()["reply"] == "stub reply"
+
+
+def test_mobile_page_served_unauthenticated(client):
+    c, _ = client
+    r = c.get("/mobile")
+    assert r.status_code == 200
+    assert "VAJRA" in r.text and "/api/computer/run" in r.text and "/api/approvals" in r.text

@@ -33,6 +33,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from core.agents.assist_agent import AssistAgent
 from core.agents.chat_agent import ChatAgent
@@ -186,6 +187,15 @@ async def health() -> dict:
 @app.get("/api/ping", dependencies=AUTH)
 async def ping() -> SimpleOk:
     return SimpleOk(detail="paired")
+
+
+@app.get("/mobile", response_class=HTMLResponse)
+async def mobile() -> str:
+    """Vajra Mobile - the phone controller. The page itself is unauthenticated;
+    every API call it makes carries the pairing token the user enters."""
+    from core.api.mobile import MOBILE_HTML
+
+    return MOBILE_HTML
 
 
 # -- projects --------------------------------------------------------
@@ -761,7 +771,10 @@ async def events_ws(ws: WebSocket) -> None:
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("core.api.main:app", host=settings.vajra_host, port=settings.vajra_port, reload=False)
+    host = settings.bind_host
+    if host == "0.0.0.0":  # noqa: S104
+        log.warning("Vajra Core is LAN-bound (0.0.0.0). Only do this on a trusted network.")
+    uvicorn.run("core.api.main:app", host=host, port=settings.vajra_port, reload=False)
 
 
 if __name__ == "__main__":

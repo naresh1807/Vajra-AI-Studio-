@@ -49,3 +49,4 @@ ignore = ["B008", "UP042"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "core/tools/computer_tools.py" = ["E501"]  # tool descriptions read better unwrapped
+"core/api/mobile.py" = ["E501"]  # embedded HTML/JS

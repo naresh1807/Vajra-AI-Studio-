@@ -43,11 +43,18 @@ class Settings(BaseSettings):
 
     vajra_host: str = "127.0.0.1"
     vajra_port: int = 8760
+    #: bind to 0.0.0.0 so a phone on the same Wi-Fi can reach the Core.
+    #: only enable on a trusted LAN - the pairing token is the only guard.
+    vajra_bind_lan: bool = False
     vajra_db_path: str = "./data/vajra.db"
     vajra_log_dir: str = "./logs"
     vajra_pairing_token: str = "change-me-local-only"
     vajra_max_retries: int = 2
     vajra_autonomy_enabled: bool = True
+
+    @property
+    def bind_host(self) -> str:
+        return "0.0.0.0" if self.vajra_bind_lan else self.vajra_host  # noqa: S104
 
     nvidia_api_key: str | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"

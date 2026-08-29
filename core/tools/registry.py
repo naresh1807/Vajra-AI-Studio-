@@ -97,7 +97,7 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         StopProcessTool,
     )
     from core.tools.quality_tools import RunBuildTool, RunLinterTool, RunTestsTool
-    from core.tools.search_tools import ProjectTreeTool, SearchTextTool
+    from core.tools.search_tools import ProjectTreeTool, SearchTextTool, SemanticSearchTool
 
     registry = ToolRegistry(policy or PolicyEngine())
     for tool_cls in (
@@ -106,6 +106,7 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         PatchFileTool,
         CreateDirectoryTool,
         SearchTextTool,
+        SemanticSearchTool,
         ProjectTreeTool,
         RunCommandTool,
         StartProcessTool,

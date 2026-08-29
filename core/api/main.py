@@ -71,6 +71,8 @@ from core.api.schemas import (
     ProcStartRequest,
     ProcStopRequest,
     ProjectInfo,
+    RagReindexRequest,
+    RagSearchRequest,
     SearchRequest,
     SecurityRunRequest,
     SecurityScopeIn,
@@ -88,6 +90,7 @@ from core.lsp.config import declared_languages as lsp_declared
 from core.lsp.config import supported as lsp_supported
 from core.orchestrator import Orchestrator
 from core.orchestrator.approvals import ApprovalGate
+from core.rag import rag_manager
 from core.runtime import format as fmtsvc
 from core.runtime import git as gitsvc
 from core.runtime import process_manager
@@ -223,7 +226,18 @@ async def open_project(req: OpenProjectRequest) -> ProjectInfo:
     profile = discover_workspace(str(target))
     name = req.name or Path(profile.root).name or "project"
     pid = await db.upsert_project(name, profile.root, profile.model_dump())
+    # build/refresh the semantic index in the background - never block opening
+    asyncio.create_task(_safe_reindex(profile.root))
     return ProjectInfo(id=pid, name=name, root_path=profile.root, profile=profile.model_dump())
+
+
+async def _safe_reindex(root: str) -> None:
+    try:
+        stats = await rag_manager.reindex(root)
+        await db.record_indexed_files(root, stats.pop("paths", []))
+        await events.record("report", note=f"rag index ready: {stats}")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("rag reindex failed for %s: %s", root, exc)
 
 
 @app.get("/api/projects", dependencies=AUTH)
@@ -385,6 +399,33 @@ async def assist_complete(req: InlineCompleteRequest) -> dict:
     return {"text": text}
 
 
+# -- RAG: local semantic index over the workspace ------------------
+@app.get("/api/rag/status", dependencies=AUTH)
+async def rag_status(root: str) -> dict:
+    return rag_manager.status(root)
+
+
+@app.post("/api/rag/reindex", dependencies=AUTH)
+async def rag_reindex(req: RagReindexRequest) -> dict:
+    stats = await rag_manager.reindex(req.root)
+    paths = stats.pop("paths", [])
+    await db.record_indexed_files(req.root, paths)
+    await events.record("report", note=f"rag reindex: {stats}")
+    return stats
+
+
+@app.post("/api/rag/search", dependencies=AUTH)
+async def rag_search(req: RagSearchRequest) -> dict:
+    hits = await rag_manager.retrieve(req.root, req.query, k=max(1, min(req.k, 20)))
+    return {
+        "hits": [
+            {"ref": h.ref, "path": h.path, "start_line": h.start_line,
+             "end_line": h.end_line, "score": round(h.score, 4), "text": h.text}
+            for h in hits
+        ]
+    }
+
+
 # -- language server (diagnostics / hover / completion / definition) --
 @app.get("/api/lsp/support", dependencies=AUTH)
 async def lsp_support() -> dict:
@@ -450,6 +491,7 @@ async def terminal_run(req: TerminalRunRequest) -> TerminalRunResult:
     await db.record_event(
         {"kind": "terminal.run", "payload": {"argv": argv, "exit_code": result.exit_code}}
     )
+    await db.record_terminal_run(req.root, " ".join(str(a) for a in argv), result.exit_code)
     return TerminalRunResult(
         stdout=result.stdout,
         stderr=result.stderr,

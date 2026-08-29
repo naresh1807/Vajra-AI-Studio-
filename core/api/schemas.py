@@ -216,6 +216,16 @@ class ComputerRunResult(BaseModel):
     succeeded: bool = True
 
 
+class RagReindexRequest(BaseModel):
+    root: str = Field(min_length=1)
+
+
+class RagSearchRequest(BaseModel):
+    root: str = Field(min_length=1)
+    query: str = Field(min_length=1)
+    k: int = 6
+
+
 class SecurityRunRequest(BaseModel):
     instruction: str = Field(min_length=1)
     root: str = ""

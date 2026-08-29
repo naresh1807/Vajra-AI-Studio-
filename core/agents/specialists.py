@@ -25,7 +25,7 @@ class PlannerAgent(Agent):
         "Define dependencies and a concrete success criterion per task. Prefer: checkpoint -> "
         "implement -> test -> review."
     )
-    allowed_tools = ("project_tree", "read_file", "search_text", "git_status")
+    allowed_tools = ("project_tree", "read_file", "search_text", "semantic_search", "git_status")
 
     async def create_task_graph(self, goal_id: str, ctx: AgentContext, max_retries: int = 2) -> TaskGraph:
         schema_hint = (
@@ -103,7 +103,7 @@ class CoderAgent(Agent):
     )
     allowed_tools = (
         "read_file", "write_file", "patch_file", "create_file", "create_directory",
-        "search_text", "project_tree",
+        "search_text", "semantic_search", "project_tree",
     )
 
 

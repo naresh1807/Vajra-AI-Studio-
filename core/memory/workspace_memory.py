@@ -14,6 +14,7 @@ from typing import Any
 
 class WorkspaceMemory:
     def __init__(self, root: str | Path) -> None:
+        self.root = str(Path(root).resolve())
         self.dir = Path(root) / ".vajra"
         self.dir.mkdir(exist_ok=True)
 
@@ -21,6 +22,31 @@ class WorkspaceMemory:
         record = {"ts": time.time(), **record}
         with (self.dir / name).open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+        self._mirror(name, record)
+
+    def _mirror(self, name: str, record: dict[str, Any]) -> None:
+        """Best-effort copy into the SQLite `memories` table (manual v3.0)."""
+        kind = {"decisions.jsonl": "decision", "known_errors.jsonl": "known_error",
+                "task_history.jsonl": "task"}.get(name)
+        if not kind:
+            return
+        try:
+            import sqlite3
+
+            from core.config import get_settings
+
+            with sqlite3.connect(get_settings().db_path) as conn:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS memories (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "root TEXT NOT NULL, kind TEXT NOT NULL, content TEXT NOT NULL, created_at REAL NOT NULL)"
+                )
+                conn.execute(
+                    "INSERT INTO memories (root, kind, content, created_at) VALUES (?,?,?,?)",
+                    (self.root, kind, json.dumps({k: v for k, v in record.items() if k != "ts"}),
+                     record.get("ts", time.time())),
+                )
+        except Exception:  # noqa: BLE001 - the JSONL file is the source of truth
+            pass
 
     def _read(self, name: str, limit: int | None = None) -> list[dict[str, Any]]:
         path = self.dir / name

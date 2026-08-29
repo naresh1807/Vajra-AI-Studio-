@@ -52,6 +52,35 @@ class SearchTextTool(Tool):
         return ToolResult.ok("\n".join(hits) or "(no matches)", metadata={"hits": len(hits)})
 
 
+class SemanticSearchTool(Tool):
+    name = "semantic_search"
+    description = (
+        "Find the workspace code chunks most relevant to a natural-language query "
+        "(meaning, not exact text). Returns path:lines + a snippet, best first. "
+        "Use for 'where is X handled', 'how does Y work' - complements search_text."
+    )
+    risk = RiskLevel.LOW
+    parameters = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "k": {"type": "integer", "description": "how many chunks (default 6)"},
+        },
+        "required": ["query"],
+    }
+
+    async def run(self, ctx: ToolContext, query: str = "", k: int = 6, **_: Any) -> ToolResult:
+        from core.rag import rag_manager
+
+        if not ctx.workspace_root:
+            return ToolResult.fail("no workspace open")
+        hits = await rag_manager.retrieve(ctx.workspace_root, query, k=max(1, min(k, 15)))
+        if not hits:
+            return ToolResult.ok("(no indexed matches - run /api/rag/reindex)")
+        blocks = [f"### {h.ref}  (score {h.score:.2f})\n{h.text}" for h in hits]
+        return ToolResult.ok("\n\n".join(blocks), metadata={"hits": [h.ref for h in hits]})
+
+
 class ProjectTreeTool(Tool):
     name = "project_tree"
     description = "List the workspace file tree (depth-limited, ignores vendor dirs)."

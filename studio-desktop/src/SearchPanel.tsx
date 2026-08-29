@@ -13,6 +13,7 @@ export function SearchPanel({
   const [q, setQ] = useState("");
   const [glob, setGlob] = useState("*");
   const [regex, setRegex] = useState(false);
+  const [semantic, setSemantic] = useState(false);
   const [hits, setHits] = useState<Array<{ path: string; line: number; text: string }>>([]);
   const [truncated, setTruncated] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,9 +22,17 @@ export function SearchPanel({
     if (!q.trim() || !root) return;
     setBusy(true);
     try {
-      const r = await api.search(root, q, { is_regex: regex, glob: glob || "*" });
-      setHits(r.hits);
-      setTruncated(r.truncated);
+      if (semantic) {
+        const r = await api.ragSearch(root, q, 12);
+        setHits(
+          r.hits.map((h) => ({ path: h.path, line: h.start_line, text: `~${h.score.toFixed(2)}  ${h.text.split("\n")[0].slice(0, 160)}` })),
+        );
+        setTruncated(false);
+      } else {
+        const r = await api.search(root, q, { is_regex: regex, glob: glob || "*" });
+        setHits(r.hits);
+        setTruncated(r.truncated);
+      }
     } catch {
       setHits([]);
     } finally {
@@ -41,15 +50,26 @@ export function SearchPanel({
       <div className="search-head">
         <input
           autoFocus
-          placeholder="Search workspace"
+          placeholder={semantic ? "Ask by meaning: where is X handled?" : "Search workspace"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && run()}
         />
         <div className="row" style={{ marginTop: 6 }}>
-          <input className="glob" placeholder="files: *  or  *.py" value={glob} onChange={(e) => setGlob(e.target.value)} />
-          <button className={`mini ${regex ? "on" : ""}`} title="Regex" onClick={() => setRegex((v) => !v)}>
-            .*
+          {!semantic && (
+            <>
+              <input className="glob" placeholder="files: *  or  *.py" value={glob} onChange={(e) => setGlob(e.target.value)} />
+              <button className={`mini ${regex ? "on" : ""}`} title="Regex" onClick={() => setRegex((v) => !v)}>
+                .*
+              </button>
+            </>
+          )}
+          <button
+            className={`mini ${semantic ? "on" : ""}`}
+            title="Semantic (meaning-based) search"
+            onClick={() => setSemantic((v) => !v)}
+          >
+            ✦
           </button>
           <button className="mini" disabled={busy || !q.trim()} onClick={run}>
             {busy ? "…" : "Go"}

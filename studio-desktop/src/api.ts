@@ -111,6 +111,26 @@ export class Api {
     );
   }
 
+  ragSearch(root: string, query: string, k = 8) {
+    return this.j<{ hits: Array<{ ref: string; path: string; start_line: number; end_line: number; score: number; text: string }> }>(
+      `/api/rag/search`,
+      { method: "POST", headers: this.h(), body: JSON.stringify({ root, query, k }) },
+    );
+  }
+  ragReindex(root: string) {
+    return this.j<{ files: number; chunks: number; changed: number; embedder: string }>(`/api/rag/reindex`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root }),
+    });
+  }
+  ragStatus(root: string) {
+    return this.j<{ indexed: boolean; files: number; chunks: number; embedder: string }>(
+      `/api/rag/status?root=${encodeURIComponent(root)}`,
+      { headers: this.h(false) },
+    );
+  }
+
   readFile(root: string, path: string) {
     return this.j<{ path: string; content: string; bytes: number; truncated: boolean }>(`/api/files/read`, {
       method: "POST",

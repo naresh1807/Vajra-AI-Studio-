@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     vajra_local_model: str = "qwen2.5-coder"
     vajra_local_base_url: str = "http://localhost:11434/v1"
 
+    # RAG embeddings. Empty base_url -> offline lexical fallback (no network).
+    # Point at any OpenAI-compatible /embeddings endpoint (NIM, Ollama, ...).
+    vajra_embed_model: str = "nvidia/nv-embedqa-e5-v5"
+    vajra_embed_base_url: str = ""
+    vajra_embed_api_key_env: str = "NVIDIA_API_KEY"
+
     @property
     def db_path(self) -> Path:
         p = (REPO_ROOT / self.vajra_db_path).resolve()

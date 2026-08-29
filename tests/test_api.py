@@ -124,6 +124,21 @@ def test_osdev_providers_route(client):
     assert r.status_code == 200 and "x86_64" in r.json()["qemu"]
 
 
+def test_rag_reindex_search_status(client, tmp_workspace):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    ri = c.post("/api/rag/reindex", json={"root": str(tmp_workspace)}, headers=h)
+    assert ri.status_code == 200 and ri.json()["files"] >= 1
+    st = c.get("/api/rag/status", params={"root": str(tmp_workspace)}, headers=h)
+    assert st.status_code == 200 and st.json()["indexed"] is True
+    se = c.post(
+        "/api/rag/search",
+        json={"root": str(tmp_workspace), "query": "python module", "k": 3},
+        headers=h,
+    )
+    assert se.status_code == 200 and isinstance(se.json()["hits"], list)
+
+
 def test_security_scope_save_and_list(client, tmp_workspace):
     c, token = client
     h = {"X-Vajra-Token": token}

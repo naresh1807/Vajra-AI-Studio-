@@ -110,6 +110,28 @@ class Database:
             (goal_id, task_id, path, time.time()),
         )
 
+    async def record_indexed_files(self, root: str, paths: list[str]) -> None:
+        now = time.time()
+        rows = [(root, p, now) for p in paths[:8000]]
+        for i in range(0, len(rows), 500):
+            await self._write(
+                "INSERT OR REPLACE INTO project_files (root, path, indexed_at) VALUES "
+                + ",".join(["(?,?,?)"] * len(rows[i : i + 500])),
+                tuple(v for row in rows[i : i + 500] for v in row),
+            )
+
+    async def record_memory(self, root: str, kind: str, content: str) -> None:
+        await self._write(
+            "INSERT INTO memories (root, kind, content, created_at) VALUES (?,?,?,?)",
+            (root, kind, content, time.time()),
+        )
+
+    async def record_terminal_run(self, root: str | None, command: str, exit_code: int | None) -> None:
+        await self._write(
+            "INSERT INTO terminal_runs (root, command, exit_code, created_at) VALUES (?,?,?,?)",
+            (root, command, exit_code, time.time()),
+        )
+
     async def diff_for_goal(self, goal_id: str) -> list[str]:
         rows = await self._query(
             "SELECT DISTINCT path FROM file_changes WHERE goal_id = ? ORDER BY path", (goal_id,)

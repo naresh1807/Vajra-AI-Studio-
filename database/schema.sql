@@ -78,6 +78,37 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT
 );
 
+-- Semantic-index bookkeeping (the chunk vectors live in <root>/.vajra/rag/).
+CREATE TABLE IF NOT EXISTS project_files (
+    root        TEXT NOT NULL,
+    path        TEXT NOT NULL,
+    indexed_at  REAL NOT NULL,
+    PRIMARY KEY (root, path)
+);
+
+-- Long-lived project memory (decisions, known errors), also mirrored to
+-- <root>/.vajra/*.jsonl by core.memory.workspace_memory.
+CREATE TABLE IF NOT EXISTS memories (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    root        TEXT NOT NULL,
+    kind        TEXT NOT NULL,          -- decision | known_error | task
+    content     TEXT NOT NULL,
+    created_at  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS terminal_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    root        TEXT,
+    command     TEXT NOT NULL,
+    exit_code   INTEGER,
+    created_at  REAL NOT NULL
+);
+
+-- Manual v3.0 names for the run/step tables.
+CREATE VIEW IF NOT EXISTS agent_runs  AS SELECT * FROM goals;
+CREATE VIEW IF NOT EXISTS agent_steps AS SELECT * FROM tasks;
+
 CREATE INDEX IF NOT EXISTS idx_tasks_goal ON tasks(goal_id);
 CREATE INDEX IF NOT EXISTS idx_events_goal ON audit_events(goal_id);
 CREATE INDEX IF NOT EXISTS idx_toolcalls_goal ON tool_calls(goal_id);
+CREATE INDEX IF NOT EXISTS idx_memories_root ON memories(root);

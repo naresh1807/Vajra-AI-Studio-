@@ -15,7 +15,9 @@ from dataclasses import dataclass
 from core.llm import ChatMessage, ModelRouter, ToolSpec
 from core.tools import ToolCall, ToolContext, ToolRegistry
 
-READ_ONLY_TOOLS = ("read_file", "search_text", "project_tree", "git_status", "git_diff")
+READ_ONLY_TOOLS = (
+    "read_file", "search_text", "semantic_search", "project_tree", "git_status", "git_diff",
+)
 
 _SYSTEM = (
     "You are Vajra, a personal engineering assistant embedded in the Vajra AI Studio IDE. "
@@ -60,6 +62,28 @@ class ChatAgent:
             sys += f"\n\n# Current workspace\n{workspace_summary}"
         return [ChatMessage(role="system", content=sys), *history]
 
+    async def _retrieve(self, workspace_root: str | None, history: list[ChatMessage]) -> str:
+        """Pull the most relevant workspace chunks for the latest user turn."""
+        if not workspace_root:
+            return ""
+        last_user = next((m.content for m in reversed(history) if m.role == "user"), "")
+        if len(last_user.strip()) < 8:
+            return ""
+        try:
+            from core.rag import rag_manager
+
+            hits = await rag_manager.retrieve(workspace_root, last_user, k=4)
+        except Exception:  # noqa: BLE001 - retrieval is best-effort
+            return ""
+        hits = [h for h in hits if h.score > 0.15]
+        if not hits:
+            return ""
+        blocks = "\n\n".join(f"# {h.ref}\n{h.text}" for h in hits)
+        return (
+            "Relevant code from the workspace (retrieved automatically - cite paths, "
+            "and read the full file if you need more):\n\n" + blocks
+        )
+
     async def respond(
         self,
         history: list[ChatMessage],
@@ -70,6 +94,10 @@ class ChatAgent:
         messages = self._prime(history, workspace_summary)
         specs = self._specs(workspace_root)
         tool_ctx = ToolContext(workspace_root=workspace_root) if workspace_root else None
+
+        retrieved = await self._retrieve(workspace_root, history)
+        if retrieved:
+            messages.insert(1, ChatMessage(role="user", content=retrieved))
 
         for _hop in range(_MAX_TOOL_HOPS):
             resp = await self.router.complete(messages, tools=specs, max_tokens=1200)

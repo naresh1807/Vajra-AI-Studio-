@@ -12,7 +12,7 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     throw "cargo not found. Install Rust from https://rustup.rs and reopen the shell."
 }
 
-Push-Location "$root\studio-desktop"
+Push-Location "$root\legacy/studio-desktop"
 try {
     if (-not (Test-Path "node_modules")) { npm install }
     npm run tauri build

@@ -32,7 +32,7 @@ if ($Setup) {
   if (-not (Test-Path $out) -and (Test-Path $target)) { Move-Item $target $out }
   & (Join-Path $PSScriptRoot "_devenv-setup.bat") $vscode
   if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
-  $inst = Get-ChildItem (Join-Path $vscode ".build\win32\user-setup\*.exe") | Select-Object -First 1
+  $inst = Get-ChildItem (Join-Path $vscode ".build\win32-x64\user-setup\*.exe"),(Join-Path $vscode ".build\win32\user-setup\*.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
   Copy-Item $inst.FullName (Join-Path $studio "VajraAIStudioSetup-x64.exe") -Force
   Write-Host "`n-> $(Join-Path $studio 'VajraAIStudioSetup-x64.exe')  ($([math]::Round($inst.Length/1MB,0)) MB)" -ForegroundColor Green
 }

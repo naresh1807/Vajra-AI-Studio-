@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     vajra_bind_lan: bool = False
     vajra_db_path: str = "./data/vajra.db"
     vajra_log_dir: str = "./logs"
-    vajra_pairing_token: str = "change-me-local-only"
+    #: leave empty -> the Core uses the strong random secret in data/device.json.
+    #: override only with a long random value of your own.
+    vajra_pairing_token: str = ""
     vajra_max_retries: int = 2
     vajra_autonomy_enabled: bool = True
 

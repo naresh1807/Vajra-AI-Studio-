@@ -15,9 +15,9 @@ high-level goal and let it plan → edit → save → run → test → debug →
 |------|------|
 | `core/` | Vajra Core — `api/` (FastAPI + WS), `orchestrator/`, `agents/`, `llm/`, `rag/`, `tools/`, `policy/`, `memory/`, `workspace/`, `osdev/`, `security/`, `events/` |
 | `database/` | SQLite store + repositories (Postgres-swappable) |
-| `studio/` | **Vajra AI Studio** — Code-OSS fork that bundles the Vajra extension (primary desktop IDE) |
-| `vscode-extension/` | The Vajra extension — panel, assisted edits, test explorer, semantic search (built-in for `studio/`, also usable in stock VS Code) |
-| `studio-desktop/` | Earlier Tauri + React + Monaco shell (kept as a lightweight alternative) |
+| `studio/` | **Vajra AI Studio** — the primary desktop IDE. A rebranded Code-OSS fork that bundles the Vajra extension. `scripts/bootstrap.ps1` + `scripts/build.ps1`. |
+| `vscode-extension/` | The Vajra extension — panel, assisted edits, test explorer, semantic search, Core auto-start (built-in for `studio/`, also usable in stock VS Code) |
+| `legacy/studio-desktop/` | **Legacy** — the earlier Tauri + React + Monaco prototype shell. Not the product; kept for reference only. |
 | `mobile-android/flutter_app/` | Vajra Mobile — native Android companion (`scripts/build-apk.ps1`) |
 | `extensions/` | Language/tool packs — LSP servers, DAP adapters, formatters, linters, templates |
 | `config/models.yaml` | Model routing config (Nemotron/NIM primary, local fallback) |
@@ -36,15 +36,18 @@ vajra-api                    # start Vajra Core on http://127.0.0.1:8760
 
 Check it is up: `curl http://127.0.0.1:8760/api/health`
 
-Run the Studio UI:
+Build the desktop IDE (**Vajra AI Studio**, the Code-OSS fork):
 
 ```powershell
-cd studio-desktop
-npm install
-npm run dev                  # http://localhost:1420
+cd studio
+scripts\bootstrap.ps1        # clone + rebrand + bundle extension + npm ci  (~20 min)
+scripts\build.ps1            # gulp compile  (~30 min)   -> VajraAIStudio-win32-x64\
+scripts\build.ps1 -Setup     # ...also VajraAIStudioSetup-x64.exe
 ```
 
-Or `pwsh -File scripts/dev.ps1` to start both.
+The extension starts the Python Core (`vajra-api`) automatically on launch.
+The legacy Tauri shell (`legacy/studio-desktop/`) still runs via `npm run dev`
+there, but it is not the product.
 
 ## Model layer
 

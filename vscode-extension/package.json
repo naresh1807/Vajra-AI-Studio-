@@ -74,8 +74,8 @@
         },
         "vajra.pairingToken": {
           "type": "string",
-          "default": "change-me-local-only",
-          "description": "Pairing token shared with your local Vajra Core (matches VAJRA_PAIRING_TOKEN)."
+          "default": "",
+          "description": "Pairing token for the local Vajra Core. Leave blank when the Core is auto-started from the same machine (it reads data/device.json directly); set the device secret or a paired-device token to connect from elsewhere."
         },
         "vajra.inlineCompletions": {
           "type": "boolean",

@@ -48,3 +48,6 @@ mobile-android/flutter_app/.flutter-plugins*
 mobile-android/flutter_app/android/.gradle/
 mobile-android/flutter_app/android/local.properties
 mobile-android/flutter_app/**/*.iml
+
+# stale on-disk copy after the move to legacy/ (dir was locked); delete when free
+/studio-desktop/

@@ -1,13 +1,13 @@
 # Windows installer
 
-The Windows installer is produced by Tauri from `studio-desktop/`.
+The Windows installer is produced by Tauri from `legacy/legacy/studio-desktop/`.
 
 ## Build
 
 ```powershell
 pwsh -File scripts/build-installer.ps1
 # or, by hand:
-cd studio-desktop
+cd legacy/studio-desktop
 npm install
 npm run tauri build
 ```
@@ -15,7 +15,7 @@ npm run tauri build
 Output:
 
 ```
-studio-desktop/src-tauri/target/release/bundle/nsis/Vajra AI Studio_0.2.0_x64-setup.exe
+legacy/legacy/studio-desktop/src-tauri/target/release/bundle/nsis/Vajra AI Studio_0.2.0_x64-setup.exe
 ```
 
 (a ~5 MB NSIS installer; the packaged app is ~14 MB). Build artifacts are not
@@ -44,6 +44,6 @@ start/stop it as a sidecar (`start_core` / `stop_core`), or run it yourself.
 The manual calls the deliverable `VajraAI-Setup.exe`:
 
 ```powershell
-Copy-Item "studio-desktop/src-tauri/target/release/bundle/nsis/Vajra AI Studio_0.2.0_x64-setup.exe" `
+Copy-Item "legacy/legacy/studio-desktop/src-tauri/target/release/bundle/nsis/Vajra AI Studio_0.2.0_x64-setup.exe" `
           "VajraAI-Setup.exe"
 ```

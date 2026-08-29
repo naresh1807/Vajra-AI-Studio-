@@ -41,6 +41,11 @@ export interface RunRef {
 }
 
 export class VajraClient {
+  private tokenOverride = "";
+  /** Set by CoreManager when it auto-starts a same-machine Core (reads data/device.json). */
+  setToken(t: string) {
+    this.tokenOverride = t || "";
+  }
   private cfg() {
     return vscode.workspace.getConfiguration("vajra");
   }
@@ -48,7 +53,7 @@ export class VajraClient {
     return this.cfg().get<string>("apiUrl", "http://127.0.0.1:8760").replace(/\/$/, "");
   }
   private token(): string {
-    return this.cfg().get<string>("pairingToken", "");
+    return this.cfg().get<string>("pairingToken", "") || this.tokenOverride;
   }
   private h(): Record<string, string> {
     return { "Content-Type": "application/json", "X-Vajra-Token": this.token() };

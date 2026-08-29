@@ -26,6 +26,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -97,6 +98,7 @@ from core.runtime import git as gitsvc
 from core.runtime import process_manager
 from core.runtime import terminal as termsvc
 from core.runtime import testing as testsvc
+from core.security.pairing import identity
 from core.workspace import (
     WorkspaceError,
     build_tree,
@@ -126,13 +128,46 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await dap_manager.shutdown_all()
 
 
-app = FastAPI(title="Vajra Core API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Vajra Core API", version="0.3.0", lifespan=lifespan)
+
+# CORS: only local IDE / webview origins - never "*" for an authenticated
+# computer-control API (master-prompt P4).
+_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:1420", "http://localhost:1420",  # studio-desktop dev
+    "http://127.0.0.1:3000", "http://localhost:3000",
+    "vscode-webview://", "vscode-file://vscode-app", "https://vscode-webview.net",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # localhost clients only; API is not publicly bound
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_origin_regex=r"^(vscode-webview|vscode-file)://.*$",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "X-Vajra-Token", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def _api_v1_and_ratelimit(request, call_next):
+    # P1: accept the stable /api/v1/* prefix as an alias of /api/*
+    p = request.scope["path"]
+    if p.startswith("/api/v1/"):
+        request.scope["path"] = "/api/" + p[len("/api/v1/"):]
+    # P4: coarse per-IP rate limit on mutating calls
+    if request.method in ("POST", "PUT", "DELETE"):
+        ip = request.client.host if request.client else "?"
+        now = time.monotonic()
+        bucket = _RL.setdefault(ip, [])
+        bucket[:] = [t for t in bucket if now - t < 10.0]
+        if len(bucket) >= 60:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse({"detail": "rate limit: slow down"}, status_code=429)
+        bucket.append(now)
+    return await call_next(request)
+
+
+_RL: dict[str, list[float]] = {}
 
 events = EventBus(settings.log_dir)
 approvals = ApprovalGate()
@@ -164,6 +199,17 @@ async def _persist_events() -> None:
                     await db.record_file_change(event.goal_id, event.task_id, path)
 
 
+def _authenticates(token: str | None) -> bool:
+    """A request is authenticated if it presents the (secure) configured token,
+    the auto-generated device secret, or a live per-device credential."""
+    if not token:
+        return False
+    ident = identity()
+    if ident.all_tokens_are_secure(settings.vajra_pairing_token) and token == settings.vajra_pairing_token:
+        return True
+    return ident.accepts(token)
+
+
 def require_token(
     authorization: str | None = Header(default=None),
     x_vajra_token: str | None = Header(default=None),
@@ -172,7 +218,7 @@ def require_token(
     if authorization and authorization.lower().startswith("bearer "):
         presented = authorization.split(" ", 1)[1].strip()
     presented = presented or x_vajra_token
-    if presented != settings.vajra_pairing_token:
+    if not _authenticates(presented):
         raise HTTPException(status_code=401, detail="invalid or missing pairing token")
 
 
@@ -200,6 +246,47 @@ async def health() -> dict:
 @app.get("/api/ping", dependencies=AUTH)
 async def ping() -> SimpleOk:
     return SimpleOk(detail="paired")
+
+
+# -- device pairing (P3 / P25) ----------------------------------------
+@app.get("/api/pairing/pin", dependencies=AUTH)
+async def pairing_pin() -> dict:
+    """Issue a short-lived one-time code + the payload a phone needs to pair."""
+    ident = identity()
+    pin = ident.new_pin()
+    return {
+        "device_id": ident.device_id,
+        "pin": pin,
+        "expires_in": 300,
+        "connect": {"url": f"http://{settings.vajra_host}:{settings.vajra_port}"},
+    }
+
+
+@app.post("/api/pairing/redeem")
+async def pairing_redeem(body: dict) -> dict:
+    """Unauthenticated: a phone redeems the PIN for its own device credential."""
+    dev = identity().redeem_pin(str(body.get("pin", "")), str(body.get("name", "device")))
+    if not dev:
+        raise HTTPException(401, "bad or expired pairing code")
+    return {"device_id": dev.device_id, "token": dev.token, "name": dev.name}
+
+
+@app.get("/api/pairing/devices", dependencies=AUTH)
+async def pairing_devices() -> dict:
+    return {
+        "device_id": identity().device_id,
+        "devices": [
+            {"device_id": d.device_id, "name": d.name, "created_at": d.created_at,
+             "last_seen": d.last_seen, "revoked": d.revoked}
+            for d in identity().devices
+        ],
+    }
+
+
+@app.post("/api/pairing/revoke", dependencies=AUTH)
+async def pairing_revoke(body: dict) -> SimpleOk:
+    ok = identity().revoke(str(body.get("device_id", "")))
+    return SimpleOk(ok=ok, detail="revoked" if ok else "unknown device")
 
 
 @app.get("/mobile", response_class=HTMLResponse)
@@ -910,7 +997,7 @@ async def resolve_approval(req: ApproveRequest) -> SimpleOk:
 @app.websocket("/ws/events")
 async def events_ws(ws: WebSocket) -> None:
     token = ws.query_params.get("token")
-    if token != settings.vajra_pairing_token:
+    if not _authenticates(token):
         await ws.close(code=4401)
         return
     await ws.accept()
@@ -924,9 +1011,17 @@ async def events_ws(ws: WebSocket) -> None:
 def run() -> None:
     import uvicorn
 
+    ident = identity()
     host = settings.bind_host
     if host == "0.0.0.0":  # noqa: S104
+        if not ident.all_tokens_are_secure(settings.vajra_pairing_token):
+            raise SystemExit(
+                "Refusing to LAN-bind (VAJRA_BIND_LAN=true) with an insecure VAJRA_PAIRING_TOKEN. "
+                f"Unset it to use the auto-generated device secret, or set a strong one.\n"
+                f"Device secret: {ident.device_secret}"
+            )
         log.warning("Vajra Core is LAN-bound (0.0.0.0). Only do this on a trusted network.")
+    log.info("device %s  |  pairing PIN via GET /api/pairing/pin", ident.device_id)
     uvicorn.run("core.api.main:app", host=host, port=settings.vajra_port, reload=False)
 
 

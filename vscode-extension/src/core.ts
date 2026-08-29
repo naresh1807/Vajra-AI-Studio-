@@ -2,6 +2,8 @@
  *  Streams its output to an "Vajra Core" channel and stops it on shutdown. */
 import * as vscode from "vscode";
 import * as os from "os";
+import * as fs from "fs";
+import * as path from "path";
 import { ChildProcess, spawn } from "child_process";
 import { VajraClient } from "./client";
 
@@ -28,8 +30,30 @@ export class CoreManager {
     }
   }
 
+  /** For a same-machine Core with no configured token, read its device secret. */
+  private loadLocalSecret(cwd: string): void {
+    if (vscode.workspace.getConfiguration("vajra").get<string>("pairingToken", "")) return;
+    for (const dir of [cwd, path.join(cwd, ".."), process.cwd()]) {
+      try {
+        const j = JSON.parse(fs.readFileSync(path.join(dir, "data", "device.json"), "utf8"));
+        if (j.device_secret) {
+          this.client.setToken(j.device_secret);
+          this.out.appendLine("[using the local device secret from data/device.json]");
+          return;
+        }
+      } catch {
+        /* keep looking */
+      }
+    }
+  }
+
   /** Called on activation. Returns once the Core is reachable, or gives up. */
   async ensureRunning(): Promise<boolean> {
+    const cwd =
+      vscode.workspace.getConfiguration("vajra").get<string>("coreCwd", "").trim() ||
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+      os.homedir();
+    this.loadLocalSecret(cwd);
     if (await this.isUp()) {
       this._onState.fire("up");
       return true;
@@ -79,6 +103,7 @@ export class CoreManager {
     for (let i = 0; i < 40; i++) {
       await new Promise((r) => setTimeout(r, 1000));
       if (!this.proc) return false; // exited
+      this.loadLocalSecret(cwd);
       if (await this.isUp()) {
         this.out.appendLine("[Vajra Core is up]");
         this._onState.fire("up");

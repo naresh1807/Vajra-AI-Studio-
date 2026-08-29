@@ -39,7 +39,7 @@ cd extensions/language-servers && npm install && cd ../..
 ## 3. Vajra AI Studio (the IDE)
 
 ```powershell
-cd studio-desktop
+cd legacy/studio-desktop
 npm install
 npm run dev        # browser UI on http://localhost:1420
 # or:
@@ -65,7 +65,7 @@ pwsh -File scripts/dev.ps1        # Core + Studio together
 ## 6. Build the installer
 
 ```powershell
-cd studio-desktop
+cd legacy/studio-desktop
 npm run tauri build              # -> src-tauri/target/release/bundle/nsis/*-setup.exe
 ```
 

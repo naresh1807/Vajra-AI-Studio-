@@ -1,4 +1,6 @@
 vscode/
 VajraAIStudio-win32-x64/
+VajraAIStudioSetup-x64.exe
 .builddir
 *.zip
+*.exe

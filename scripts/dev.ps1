@@ -20,7 +20,7 @@ $core = Start-Process "$root\.venv\Scripts\python.exe" -ArgumentList "-m","uvico
 Start-Sleep -Seconds 3
 Write-Host "Starting Vajra AI Studio on http://localhost:1420 ..." -ForegroundColor Green
 try {
-    Push-Location "$root\studio-desktop"
+    Push-Location "$root\legacy/studio-desktop"
     if (-not (Test-Path "node_modules")) { npm install }
     npm run dev
 } finally {

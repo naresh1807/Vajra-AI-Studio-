@@ -1,34 +1,50 @@
-# Vajra AI — Desktop App
+# Vajra AI Studio
 
-Primary execution host. React + Vite UI, packaged as a Windows app with Tauri 2.
-It can start/stop the local Vajra Core (`vajra-api`) as a sidecar.
+The AI-native IDE. Tauri + React + **Monaco**. Talks to the local Vajra Core over
+`http://127.0.0.1:8760` (`/api/*` + `/ws/events`).
 
-## Dev (browser UI only)
+## Layout
+
+```
+┌ topbar: project · Core status · Settings ─────────────────────────┐
+├ Explorer ┬ editor tabs + Monaco ─────────────┬ Vajra panel ───────┤
+│ file     │                                   │ Assisted | Agent   │
+│ tree     │                                   │ chat / plan / diff │
+│          ├ Terminal | Output ────────────────┤ approvals          │
+└──────────┴───────────────────────────────────┴────────────────────┘
+```
+
+## Dev
 
 ```powershell
 cd studio-desktop
 npm install
-npm run dev        # http://localhost:1420 — talks to Vajra Core on :8760
+npm run dev          # http://localhost:1420
 ```
 
-## Dev (full Tauri window)
+First run: **Settings** → set the pairing token to match `VAJRA_PAIRING_TOKEN` in
+the Core's `.env`. Then **Open Folder** (absolute path).
 
-Needs Rust (`rustup`), WebView2 (preinstalled on Win10/11) and an icon set:
+## Modes
+
+- **Manual** — file tree, Monaco tabs, `Ctrl+S` saves via `/api/files/write` (which
+  returns a diff + previous content for rollback), integrated terminal.
+- **Assisted** — the Vajra panel in chat mode: ask about the open workspace; Vajra
+  reads your files (read-only tools) before answering.
+- **Agent** — the Vajra panel in agent mode: give a goal, watch the task graph,
+  approve gated actions; changed files refresh in the tree when it finishes.
+
+## Full Tauri window / installer
+
+Needs Rust + WebView2 + an icon set (`npx @tauri-apps/cli icon ./app-icon.png`):
 
 ```powershell
-npx @tauri-apps/cli icon ./app-icon.png    # generates src-tauri/icons/*
 npm run tauri dev
+npm run tauri build        # -> src-tauri/target/release/bundle/
 ```
 
-## Build installer
+## Not yet
 
-```powershell
-npm run tauri build        # -> src-tauri/target/release/bundle/{msi,nsis}/
-```
-
-Rename the artifact to `VajraAI-Setup.exe` / `VajraAI.msi` for distribution.
-
-## Screens
-
-Dashboard · Chat / Goal · Projects · Task Graph · Approvals · Logs · Settings
-(VS Code Coordinator, Terminal, Diff Review and Memory screens land in later phases.)
+LSP diagnostics/autocomplete, DAP debugging, split editor, command palette,
+inline completions, Ctrl+K inline edit, diff-editor accept/reject hunks, Git panel
+UI. See manual v3.0 §4 / Phases 2-5.

@@ -6,5 +6,7 @@ export default defineConfig({
   plugins: [react()],
   clearScreen: false,
   server: { port: 1420, strictPort: true },
-  build: { target: "es2021", outDir: "dist" },
+  worker: { format: "es" },
+  build: { target: "es2021", outDir: "dist", chunkSizeWarningLimit: 4000 },
+  optimizeDeps: { include: ["monaco-editor"] },
 });

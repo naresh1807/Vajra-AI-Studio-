@@ -29,6 +29,30 @@ function headers(s: Settings): Record<string, string> {
   return { "Content-Type": "application/json", "X-Vajra-Token": s.pairingToken };
 }
 
+export interface ChatMsg {
+  role: "user" | "assistant" | "tool";
+  content: string;
+}
+
+export async function chat(
+  s: Settings,
+  message: string,
+  history: ChatMsg[],
+  workspaceRoot?: string,
+): Promise<{ reply: string; tool_calls: Array<{ tool: string; success: boolean }>; model: any }> {
+  const r = await fetch(`${s.apiUrl}/api/v1/chat`, {
+    method: "POST",
+    headers: headers(s),
+    body: JSON.stringify({
+      message,
+      history: history.filter((m) => m.role !== "tool").slice(-12),
+      workspace_root: workspaceRoot || null,
+    }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function health(s: Settings) {
   const r = await fetch(`${s.apiUrl}/health`);
   if (!r.ok) throw new Error(`Core unreachable (${r.status})`);

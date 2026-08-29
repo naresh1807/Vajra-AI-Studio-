@@ -12,7 +12,6 @@ import asyncio
 import logging
 
 from core.agents.base import AgentContext
-from core.agents.specialists import PlannerAgent, build_agent_team
 from core.config import Settings, get_settings
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
@@ -43,6 +42,9 @@ class Orchestrator:
         self.router = router or ModelRouter()
         self.policy = PolicyEngine(autonomy_enabled=self.settings.vajra_autonomy_enabled)
         self.registry: ToolRegistry = build_default_registry(self.policy)
+        # Imported here (not at module top) to avoid a core.agents <-> core.orchestrator cycle.
+        from core.agents.specialists import PlannerAgent, build_agent_team
+
         self.agents = build_agent_team(self.router, self.registry)
         self.planner = PlannerAgent(self.router, self.registry)
         self._graphs: dict[str, TaskGraph] = {}

@@ -31,13 +31,21 @@ class GoalStatus(BaseModel):
     changed_files: list[str] = []
 
 
+class ChatMessageIn(BaseModel):
+    role: str = "user"
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
+    history: list[ChatMessageIn] = []
+    workspace_root: str | None = None
     goal_id: str | None = None
 
 
 class ChatResponse(BaseModel):
     reply: str
+    tool_calls: list[dict] = []
     model: dict[str, str] = {}
 
 

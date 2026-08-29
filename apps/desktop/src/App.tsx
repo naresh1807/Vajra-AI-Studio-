@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "./api";
-import type { Settings } from "./api";
+import type { ChatMsg, Settings } from "./api";
 
 type Screen = "dashboard" | "chat" | "projects" | "tasks" | "approvals" | "logs" | "settings";
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>("dashboard");
+  const [screen, setScreen] = useState<Screen>("chat");
   const [settings, setSettings] = useState<Settings>(api.loadSettings());
   const [core, setCore] = useState<{ ok: boolean; text: string }>({ ok: false, text: "checking…" });
   const [events, setEvents] = useState<any[]>([]);
@@ -39,8 +39,8 @@ export function App() {
   }, [settings]);
 
   const nav: [Screen, string][] = [
+    ["chat", "Chat"],
     ["dashboard", "Dashboard"],
-    ["chat", "Chat / Goal"],
     ["projects", "Projects"],
     ["tasks", "Task Graph"],
     ["approvals", "Approvals"],
@@ -67,7 +67,12 @@ export function App() {
 
       <main className="main">
         {screen === "dashboard" && <Dashboard core={core} events={events} />}
-        {screen === "chat" && <ChatGoal settings={settings} onGoal={(id) => { setGoalId(id); setScreen("tasks"); }} />}
+        {screen === "chat" && (
+          <Chat
+            settings={settings}
+            onGoal={(id) => { setGoalId(id); setScreen("tasks"); }}
+          />
+        )}
         {screen === "projects" && <Projects settings={settings} />}
         {screen === "tasks" && <Tasks settings={settings} goalId={goalId} />}
         {screen === "approvals" && <Approvals settings={settings} />}
@@ -106,42 +111,136 @@ function Dashboard({ core, events }: { core: { ok: boolean; text: string }; even
   );
 }
 
-function ChatGoal({ settings, onGoal }: { settings: Settings; onGoal: (id: string) => void }) {
-  const [text, setText] = useState("");
-  const [root, setRoot] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+type Bubble =
+  | { kind: "user"; text: string }
+  | { kind: "assistant"; text: string; model?: string }
+  | { kind: "tool"; text: string; ok: boolean }
+  | { kind: "system"; text: string };
 
-  async function run() {
-    setBusy(true); setErr("");
+const WS_KEY = "vajra.chat.workspace";
+
+function Chat({ settings, onGoal }: { settings: Settings; onGoal: (id: string) => void }) {
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [input, setInput] = useState("");
+  const [root, setRoot] = useState(() => {
+    try { return localStorage.getItem(WS_KEY) || ""; } catch { return ""; }
+  });
+  const [busy, setBusy] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
+  }, [bubbles, busy]);
+
+  useEffect(() => {
+    try { localStorage.setItem(WS_KEY, root); } catch { /* ignore */ }
+  }, [root]);
+
+  const history = (): ChatMsg[] =>
+    bubbles
+      .filter((b) => b.kind === "user" || b.kind === "assistant")
+      .map((b) => ({ role: b.kind as "user" | "assistant", content: (b as any).text }));
+
+  async function send() {
+    const text = input.trim();
+    if (!text || busy) return;
+    setInput("");
+    setBubbles((b) => [...b, { kind: "user", text }]);
+    setBusy(true);
+    try {
+      const res = await api.chat(settings, text, history(), root || undefined);
+      for (const tc of res.tool_calls || []) {
+        setBubbles((b) => [...b, { kind: "tool", text: `${tc.tool}`, ok: tc.success }]);
+      }
+      const modelLabel = res.model?.provider ? `${res.model.provider}:${res.model.model}` : "";
+      setBubbles((b) => [...b, { kind: "assistant", text: res.reply || "(no reply)", model: modelLabel }]);
+    } catch (e) {
+      setBubbles((b) => [...b, { kind: "system", text: `Error: ${e}` }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function build() {
+    if (!root) {
+      setBubbles((b) => [...b, { kind: "system", text: "Set a workspace folder first (field above)." }]);
+      return;
+    }
+    // Turn the conversation so far into an autonomous goal.
+    const convo = bubbles
+      .filter((b) => b.kind === "user" || b.kind === "assistant")
+      .map((b) => `${b.kind}: ${(b as any).text}`)
+      .join("\n");
+    const goalText = input.trim() || convo || "Implement what we just discussed.";
+    setBusy(true);
     try {
       await api.openProject(settings, root);
-      const g = await api.createGoal(settings, text, root);
+      const g = await api.createGoal(settings, goalText, root);
+      setBubbles((b) => [...b, { kind: "system", text: `Autonomous task started (${g.id}). Opening Task Graph…` }]);
+      setInput("");
       onGoal(g.id);
     } catch (e) {
-      setErr(String(e));
+      setBubbles((b) => [...b, { kind: "system", text: `Error: ${e}` }]);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <>
-      <h1>Chat / Goal</h1>
-      <div className="card">
-        <label className="muted">Workspace folder (absolute path)</label>
-        <input value={root} onChange={(e) => setRoot(e.target.value)} placeholder="E:\path\to\project" />
-        <label className="muted" style={{ marginTop: 10, display: "block" }}>Goal</label>
-        <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="e.g. Add a /students API endpoint and a React form, run tests." />
-        <div className="row" style={{ marginTop: 10 }}>
-          <button className="primary" disabled={busy || !text || !root} onClick={run}>
-            {busy ? "Starting…" : "Run autonomously"}
-          </button>
-          {err && <span style={{ color: "var(--bad)" }}>{err}</span>}
+    <div className="chat">
+      <div className="chat-head">
+        <h1 style={{ margin: 0 }}>Chat</h1>
+        <input
+          className="ws"
+          value={root}
+          onChange={(e) => setRoot(e.target.value)}
+          placeholder="workspace folder — E:\path\to\project (lets Vajra read your code)"
+        />
+      </div>
+
+      <div className="chat-log" ref={scroller}>
+        {bubbles.length === 0 && (
+          <div className="muted" style={{ padding: 20 }}>
+            Ask about your code, or describe a change and hit <b>Build it</b> to run the
+            autonomous plan → code → test → review loop.
+          </div>
+        )}
+        {bubbles.map((b, i) => (
+          <div key={i} className={`bubble ${b.kind}`}>
+            {b.kind === "tool" ? (
+              <span className="muted">
+                {b.ok ? "✓" : "✗"} inspected · {b.text}
+              </span>
+            ) : (
+              <>
+                <div className="who">{b.kind === "user" ? "You" : b.kind === "assistant" ? "Vajra" : "•"}</div>
+                <div className="text">{(b as any).text}</div>
+                {b.kind === "assistant" && (b as any).model && (
+                  <div className="model muted">{(b as any).model}</div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        {busy && <div className="bubble assistant"><div className="who">Vajra</div><div className="text">…</div></div>}
+      </div>
+
+      <div className="chat-input">
+        <textarea
+          rows={2}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+          }}
+          placeholder="Message Vajra…  (Enter to send, Shift+Enter for newline)"
+        />
+        <div className="row" style={{ marginTop: 6 }}>
+          <button className="primary" disabled={busy || !input.trim()} onClick={send}>Send</button>
+          <button className="ghost" disabled={busy} onClick={build}>Build it ▶</button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -24,8 +24,10 @@ def client(monkeypatch, tmp_path):
     import api.main as main
 
     importlib.reload(main)
-    main.router = _StubRouter()
-    main.orchestrator.router = _StubRouter()
+    stub = _StubRouter()
+    main.router = stub
+    main.orchestrator.router = stub
+    main.chat_agent.router = stub
     return TestClient(main.app), "test-token"
 
 

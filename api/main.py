@@ -26,6 +26,7 @@ from api.schemas import (
     ProjectInfo,
     SimpleOk,
 )
+from core.agents.chat_agent import ChatAgent
 from core.config import get_settings
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
@@ -92,6 +93,18 @@ def require_token(
 
 
 # -- health / pairing -------------------------------------------------------
+@app.get("/")
+async def root() -> dict:
+    return {
+        "service": "vajra-core",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "health": "/health",
+        "api": "/api/v1",
+        "hint": "all /api/v1/* routes need an X-Vajra-Token or Authorization: Bearer header",
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "vajra-core", "version": "0.1.0", "models": router.describe()}
@@ -201,16 +214,27 @@ async def approve(req: ApproveRequest) -> SimpleOk:
 
 
 # -- chat -------------------------------------------------------
+chat_agent = ChatAgent(router, orchestrator.registry)
+
+
 @app.post("/api/v1/chat", dependencies=[Depends(require_token)])
 async def chat(req: ChatRequest) -> ChatResponse:
-    resp = await router.complete(
-        [
-            ChatMessage(role="system", content="You are Vajra, a concise autonomous engineering assistant."),
-            ChatMessage(role="user", content=req.message),
-        ],
-        max_tokens=800,
+    history = [ChatMessage(role=m.role, content=m.content) for m in req.history]
+    history.append(ChatMessage(role="user", content=req.message))
+
+    summary = ""
+    if req.workspace_root:
+        try:
+            summary = orchestrator._summarize(discover_workspace(req.workspace_root))
+        except Exception:  # noqa: BLE001
+            summary = ""
+
+    turn = await chat_agent.respond(history, req.workspace_root, summary)
+    return ChatResponse(
+        reply=turn.reply,
+        tool_calls=turn.tool_calls,
+        model={"provider": turn.provider, "model": turn.model, **router.describe()},
     )
-    return ChatResponse(reply=resp.text, model=router.describe())
 
 
 # -- event stream -------------------------------------------------------

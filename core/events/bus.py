@@ -35,6 +35,7 @@ EventKind = Literal[
     "process.started",
     "process.stopped",
     "file.written",
+    "dap.event",
     "error",
     "report",
 ]

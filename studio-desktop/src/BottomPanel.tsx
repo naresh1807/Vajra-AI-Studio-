@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import type { Api } from "./api";
+import type { Api, DebugState } from "./api";
+import { DebugPanel } from "./DebugPanel";
 
-type Tab = "terminal" | "output" | "services";
+type Tab = "terminal" | "output" | "services" | "debug";
 
 export function BottomPanel({
   api,
   root,
   events,
+  debug,
+  setDebug,
+  onDebugFrame,
 }: {
   api: Api;
   root: string | null;
   events: any[];
+  debug: DebugState | null;
+  setDebug: (s: DebugState | null) => void;
+  onDebugFrame: (path: string, line: number) => void;
 }) {
   const [tab, setTab] = useState<Tab>("terminal");
+
+  useEffect(() => {
+    if (debug) setTab("debug");
+  }, [debug?.id]);
   const [lines, setLines] = useState<string[]>([]);
   const [cmd, setCmd] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,7 +91,14 @@ export function BottomPanel({
         <button className={tab === "services" ? "active" : ""} onClick={() => setTab("services")}>
           Services {running.length ? `(${running.length})` : ""}
         </button>
+        <button className={tab === "debug" ? "active" : ""} onClick={() => setTab("debug")}>
+          Debug {debug && debug.state !== "terminated" ? "●" : ""}
+        </button>
       </div>
+
+      {tab === "debug" && (
+        <DebugPanel api={api} state={debug} setState={setDebug} onFrame={onDebugFrame} />
+      )}
 
       {tab === "terminal" && (
         <div className="term">

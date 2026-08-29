@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Api, FileNode, loadSettings, saveSettings, Settings } from "./api";
+import { Api, DebugState, FileNode, loadSettings, saveSettings, Settings } from "./api";
 import { AssistAction, EditorArea, OpenDoc } from "./Editor";
 import { FileTree } from "./FileTree";
 import { BottomPanel } from "./BottomPanel";
@@ -52,7 +52,15 @@ export function App() {
   const [leftTab, setLeftTab] = useState<"explorer" | "git" | "search">("explorer");
   const [palette, setPalette] = useState<"commands" | "files" | null>(null);
   const [reveal, setReveal] = useState<{ path: string; line: number; n: number } | null>(null);
+  const [bps, setBps] = useState<Record<string, number[]>>({});
+  const [debug, setDebug] = useState<DebugState | null>(null);
+  const [debugFrame, setDebugFrame] = useState<{ path: string; line: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  const sep = root && root.includes("\\") ? "\\" : "/";
+  const abs = (rel: string) => `${root}${sep}${rel.replace(/\//g, sep)}`;
+  const toRel = (p: string) =>
+    root ? p.replace(root, "").replace(/^[\\/]+/, "").replace(/\\/g, "/") : p;
 
   const refreshHealth = useCallback(async () => {
     try {
@@ -251,6 +259,49 @@ export function App() {
 
   const fileList = useMemo(() => flattenFiles(tree), [tree]);
 
+  function toggleBp(line: number) {
+    if (!active) return;
+    setBps((b) => {
+      const cur = new Set(b[active] ?? []);
+      cur.has(line) ? cur.delete(line) : cur.add(line);
+      const lines = [...cur].sort((x, y) => x - y);
+      const next = { ...b, [active]: lines };
+      if (debug && debug.state !== "terminated") void api.debugBreakpoints(debug.id, abs(active), lines);
+      return next;
+    });
+  }
+
+  async function startDebug() {
+    if (!root || !active) {
+      setToast("Open a Python file to debug.");
+      return;
+    }
+    if (!active.endsWith(".py")) {
+      setToast("Debugging currently supports Python files.");
+      return;
+    }
+    try {
+      const absBps: Record<string, number[]> = {};
+      for (const [rel, lines] of Object.entries(bps)) if (lines.length) absBps[abs(rel)] = lines;
+      const s = await api.debugStart(root, active, absBps);
+      setDebug(s);
+    } catch (e) {
+      setToast(`debug: ${e}`);
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F5" && !debug) {
+        e.preventDefault();
+        void startDebug();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root, active, bps, debug]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && (e.key === "P" || e.key === "p")) {
@@ -276,6 +327,9 @@ export function App() {
         <div className="brand">⚡ VAJRA&nbsp;AI&nbsp;STUDIO</div>
         <button className="tb" onClick={openFolder}>
           {root ? root.split(/[\\/]/).pop() : "Open Folder"}
+        </button>
+        <button className="tb" onClick={startDebug} title="Debug active Python file (F5)" disabled={!!debug}>
+          ▷ Debug
         </button>
         <div className="spacer" />
         <span className={`dot ${core.ok ? "ok" : "bad"}`} title={core.text} />
@@ -317,8 +371,23 @@ export function App() {
             onOpenPath={openFileAt}
             reveal={reveal}
             inlineEnabled={settings.inlineCompletions}
+            breakpoints={active ? bps[active] ?? [] : []}
+            onToggleBreakpoint={toggleBp}
+            stoppedLine={debugFrame && active && debugFrame.path.endsWith(active) ? debugFrame.line : null}
           />
-          <BottomPanel api={api} root={root} events={events} />
+          <BottomPanel
+            api={api}
+            root={root}
+            events={events}
+            debug={debug}
+            setDebug={setDebug}
+            onDebugFrame={(p, line) => {
+              const rel = toRel(p);
+              void openFile(rel);
+              setDebugFrame({ path: p, line });
+              setReveal({ path: rel, line, n: Date.now() });
+            }}
+          />
         </div>
         <AgentPanel api={api} root={root} onFilesChanged={() => root && loadTree(root)} />
       </div>

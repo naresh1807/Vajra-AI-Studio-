@@ -107,6 +107,30 @@ class ProcStopRequest(BaseModel):
     process_id: str
 
 
+# -- debugging (DAP) ----------------------------------------------
+class DebugStartRequest(BaseModel):
+    root: str
+    program: str                       # workspace-relative script
+    args: list[str] = []
+    breakpoints: dict[str, list[int]] = {}  # {relative_path: [lines]}
+
+
+class DebugActionRequest(BaseModel):
+    session_id: str
+    action: str  # continue | next | step_in | step_out | pause
+
+
+class DebugBreakpointsRequest(BaseModel):
+    session_id: str
+    path: str
+    lines: list[int]
+
+
+class DebugEvalRequest(BaseModel):
+    session_id: str
+    expression: str
+
+
 # -- git -------------------------------------------------------------
 class GitRequest(BaseModel):
     root: str

@@ -46,6 +46,10 @@ from core.api.schemas import (
     AssistResponse,
     ChatRequest,
     ChatResponse,
+    DebugActionRequest,
+    DebugBreakpointsRequest,
+    DebugEvalRequest,
+    DebugStartRequest,
     EditorOpenRequest,
     FileReadRequest,
     FileWriteRequest,
@@ -67,6 +71,7 @@ from core.api.schemas import (
     TreeRequest,
 )
 from core.config import get_settings
+from core.dap import dap_manager
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
 from core.lsp import lsp_manager
@@ -103,6 +108,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.persist_task.cancel()
         await process_manager.stop_all()
         await lsp_manager.shutdown_all()
+        await dap_manager.shutdown_all()
 
 
 app = FastAPI(title="Vajra Core API", version="0.2.0", lifespan=lifespan)
@@ -412,6 +418,77 @@ async def terminal_run(req: TerminalRunRequest) -> TerminalRunResult:
         cwd=req.root,
         command=argv,
     )
+
+
+# -- debugging (DAP - Python via debugpy) --------------------
+@app.post("/api/debug/start", dependencies=AUTH)
+async def debug_start(req: DebugStartRequest) -> dict:
+    async def relay(payload: dict) -> None:
+        await events.record("dap.event", **{k: v for k, v in payload.items() if k != "type"})
+
+    try:
+        session = await dap_manager.start(
+            req.root, req.program, req.args, req.breakpoints, on_event=relay
+        )
+    except (FileNotFoundError, OSError) as exc:
+        raise HTTPException(400, f"cannot start debugger: {exc}") from exc
+    return session.snapshot()
+
+
+@app.get("/api/debug/sessions", dependencies=AUTH)
+async def debug_sessions() -> list[dict]:
+    return [s.snapshot() for s in dap_manager.list()]
+
+
+@app.get("/api/debug/state/{session_id}", dependencies=AUTH)
+async def debug_state(session_id: str) -> dict:
+    session = dap_manager.get(session_id)
+    if not session:
+        raise HTTPException(404, "unknown debug session")
+    snap = session.snapshot()
+    if session.state == "stopped":
+        snap["variables"] = await session.variables()
+    return snap
+
+
+@app.post("/api/debug/action", dependencies=AUTH)
+async def debug_action(req: DebugActionRequest) -> SimpleOk:
+    session = dap_manager.get(req.session_id)
+    if not session:
+        raise HTTPException(404, "unknown debug session")
+    fn = {
+        "continue": session.continue_,
+        "next": session.next,
+        "step_in": session.step_in,
+        "step_out": session.step_out,
+        "pause": session.pause,
+    }.get(req.action)
+    if not fn:
+        raise HTTPException(400, f"unknown action: {req.action}")
+    await fn()
+    return SimpleOk(detail=req.action)
+
+
+@app.post("/api/debug/breakpoints", dependencies=AUTH)
+async def debug_breakpoints(req: DebugBreakpointsRequest) -> dict:
+    session = dap_manager.get(req.session_id)
+    if not session:
+        raise HTTPException(404, "unknown debug session")
+    return {"breakpoints": await session.set_breakpoints(req.path, req.lines)}
+
+
+@app.post("/api/debug/evaluate", dependencies=AUTH)
+async def debug_evaluate(req: DebugEvalRequest) -> dict:
+    session = dap_manager.get(req.session_id)
+    if not session:
+        raise HTTPException(404, "unknown debug session")
+    return await session.evaluate(req.expression)
+
+
+@app.post("/api/debug/stop/{session_id}", dependencies=AUTH)
+async def debug_stop(session_id: str) -> SimpleOk:
+    ok = await dap_manager.stop(session_id)
+    return SimpleOk(ok=ok, detail="stopped" if ok else "unknown session")
 
 
 # -- long-running processes (dev servers) --------------------

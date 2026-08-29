@@ -41,6 +41,16 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export interface DebugState {
+  id: string;
+  state: "starting" | "running" | "stopped" | "terminated";
+  stopped_reason: string;
+  program: string;
+  frames: Array<{ id: number; name: string; path: string; line: number }>;
+  output: string;
+  variables?: Array<{ scope: string; name: string; value: string; type: string }>;
+}
+
 export interface RunStatus {
   id: string;
   goal: string;
@@ -122,6 +132,42 @@ export class Api {
       `/api/terminal/run`,
       { method: "POST", headers: this.h(), body: JSON.stringify({ root, command }) },
     );
+  }
+
+  // -- debugging --
+  debugStart(root: string, program: string, breakpoints: Record<string, number[]>, args: string[] = []) {
+    return this.j<DebugState>(`/api/debug/start`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ root, program, args, breakpoints }),
+    });
+  }
+  debugState(id: string) {
+    return this.j<DebugState>(`/api/debug/state/${id}`, { headers: this.h(false) });
+  }
+  debugAction(id: string, action: "continue" | "next" | "step_in" | "step_out" | "pause") {
+    return this.j(`/api/debug/action`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ session_id: id, action }),
+    });
+  }
+  debugBreakpoints(id: string, path: string, lines: number[]) {
+    return this.j(`/api/debug/breakpoints`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ session_id: id, path, lines }),
+    });
+  }
+  debugEvaluate(id: string, expression: string) {
+    return this.j<{ result: string | null; type: string | null; error: string | null }>(`/api/debug/evaluate`, {
+      method: "POST",
+      headers: this.h(),
+      body: JSON.stringify({ session_id: id, expression }),
+    });
+  }
+  debugStop(id: string) {
+    return fetch(`${this.s.apiUrl}/api/debug/stop/${id}`, { method: "POST", headers: this.h() });
   }
 
   procList() {

@@ -125,6 +125,29 @@ button.mini.on { background: var(--accent); color: #08111f; border-color: var(--
 .pl-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-hint { color: var(--muted); font-size: 11px; }
 
+/* debugging */
+.bp-glyph::before { content: "●"; color: var(--bad); font-size: 12px; margin-left: 3px; }
+.stopped-line { background: rgba(110,168,254,.12); }
+.stopped-glyph::before { content: "▶"; color: var(--accent); font-size: 11px; margin-left: 3px; }
+.debug { flex: 1; display: flex; flex-direction: column; min-height: 0; font-size: 12px; }
+.dbg-toolbar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.dbg-toolbar .mini { font-size: 13px; padding: 1px 7px; }
+.dbg-body { flex: 1; display: grid; grid-template-columns: 1fr 1.4fr 1.6fr; min-height: 0; }
+.dbg-col { overflow: auto; border-right: 1px solid var(--border); padding: 4px 0; }
+.dbg-h { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 4px 10px; }
+.dbg-frame { padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.dbg-frame:hover { background: var(--panel2); }
+.dbg-var { display: flex; gap: 8px; padding: 2px 10px; font-family: ui-monospace, Consolas, monospace; }
+.dbg-var .vn { color: var(--accent); }
+.dbg-var .vv { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbg-console { display: flex; flex-direction: column; border-right: none; }
+.dbg-out { flex: 1; overflow: auto; margin: 0; padding: 6px 10px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; white-space: pre-wrap; }
+.dbg-eval { display: flex; gap: 6px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--border); }
+.dbg-eval span { color: var(--accent); }
+.dbg-eval input { border: none; background: none; padding: 2px; }
+.badge.starting { background: #2a2a16; color: #e0af68; }
+.badge.terminated { background: var(--border); color: var(--muted); }
+
 /* agent panel */
 .agent { background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
 .agent .seg { display: flex; gap: 4px; }

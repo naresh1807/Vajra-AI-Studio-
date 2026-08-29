@@ -9,7 +9,15 @@ import { FolderPicker } from "./FolderPicker";
 import { GitPanel } from "./GitPanel";
 import { SearchPanel } from "./SearchPanel";
 import { CommandPalette, Command } from "./CommandPalette";
-import { langFor } from "./monaco";
+import { StatusBar } from "./StatusBar";
+import { langFor, monaco } from "./monaco";
+
+export interface Problem {
+  path: string;
+  line: number;
+  severity: number;
+  message: string;
+}
 
 function flattenFiles(node: FileNode | null, out: string[] = []): string[] {
   for (const c of node?.children ?? []) {
@@ -53,6 +61,7 @@ export function App() {
   const [palette, setPalette] = useState<"commands" | "files" | null>(null);
   const [reveal, setReveal] = useState<{ path: string; line: number; n: number } | null>(null);
   const [bps, setBps] = useState<Record<string, number[]>>({});
+  const [problems, setProblems] = useState<Problem[]>([]);
   const [debug, setDebug] = useState<DebugState | null>(null);
   const [debugFrame, setDebugFrame] = useState<{ path: string; line: number } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -266,6 +275,32 @@ export function App() {
 
   const fileList = useMemo(() => flattenFiles(tree), [tree]);
 
+  useEffect(() => {
+    const collect = () => {
+      const markers = monaco.editor.getModelMarkers({ owner: "vajra-lsp" });
+      setProblems(
+        markers
+          .map((m) => {
+            const model = monaco.editor.getModels().find((x) => x.uri.toString() === m.resource.toString());
+            const path = (model as any)?.__vajraPath as string | undefined;
+            return path ? { path, line: m.startLineNumber, severity: m.severity, message: m.message } : null;
+          })
+          .filter(Boolean) as Problem[],
+      );
+    };
+    collect();
+    const sub = monaco.editor.onDidChangeMarkers(collect);
+    return () => sub.dispose();
+  }, []);
+
+  const problemCounts = useMemo(
+    () => ({
+      errors: problems.filter((p) => p.severity === 8).length,
+      warnings: problems.filter((p) => p.severity === 4).length,
+    }),
+    [problems],
+  );
+
   function toggleBp(line: number) {
     if (!active) return;
     setBps((b) => {
@@ -396,10 +431,21 @@ export function App() {
               setReveal({ path: rel, line, n: Date.now() });
             }}
             onOpenAt={openFileAt}
+            problems={problems}
           />
         </div>
         <AgentPanel api={api} root={root} onFilesChanged={() => root && loadTree(root)} />
       </div>
+
+      <StatusBar
+        core={core}
+        root={root}
+        activePath={active}
+        problems={problemCounts}
+        onProblemsClick={() =>
+          window.dispatchEvent(new CustomEvent("vajra:bottom-tab", { detail: "problems" }))
+        }
+      />
 
       {toast && <div className="toast">{toast}</div>}
 

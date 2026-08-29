@@ -1,17 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Api, DebugState } from "./api";
+import type { Problem } from "./App";
 import { DebugPanel } from "./DebugPanel";
-import { monaco } from "./monaco";
 
 type Tab = "problems" | "terminal" | "output" | "services" | "debug";
-
-interface Problem {
-  path: string;
-  line: number;
-  column: number;
-  severity: number;
-  message: string;
-}
 
 export function BottomPanel({
   api,
@@ -21,6 +13,7 @@ export function BottomPanel({
   setDebug,
   onDebugFrame,
   onOpenAt,
+  problems,
 }: {
   api: Api;
   root: string | null;
@@ -29,34 +22,14 @@ export function BottomPanel({
   setDebug: (s: DebugState | null) => void;
   onDebugFrame: (path: string, line: number) => void;
   onOpenAt: (path: string, line: number) => void;
+  problems: Problem[];
 }) {
   const [tab, setTab] = useState<Tab>("terminal");
-  const [problems, setProblems] = useState<Problem[]>([]);
 
   useEffect(() => {
-    const collect = () => {
-      const markers = monaco.editor.getModelMarkers({ owner: "vajra-lsp" });
-      setProblems(
-        markers
-          .map((m) => {
-            const model = monaco.editor.getModels().find((x) => x.uri.toString() === m.resource.toString());
-            const path = (model as any)?.__vajraPath as string | undefined;
-            return path
-              ? {
-                  path,
-                  line: m.startLineNumber,
-                  column: m.startColumn,
-                  severity: m.severity,
-                  message: m.message,
-                }
-              : null;
-          })
-          .filter(Boolean) as Problem[],
-      );
-    };
-    collect();
-    const sub = monaco.editor.onDidChangeMarkers(collect);
-    return () => sub.dispose();
+    const h = (e: Event) => setTab((e as CustomEvent).detail as Tab);
+    window.addEventListener("vajra:bottom-tab", h);
+    return () => window.removeEventListener("vajra:bottom-tab", h);
   }, []);
 
   useEffect(() => {

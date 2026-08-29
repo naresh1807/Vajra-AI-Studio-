@@ -28,7 +28,9 @@ export function GitPanel({
   const refresh = useCallback(async () => {
     if (!root) return;
     try {
-      setSt(await api.gitStatus(root));
+      const s = await api.gitStatus(root);
+      setSt(s);
+      (window as any).__vajraBranch = s.is_repo ? s.branch : "";
       setCps(await api.gitCheckpoints(root));
     } catch (e) {
       setErr(String(e));

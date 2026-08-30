@@ -13,6 +13,7 @@ import logging
 from dataclasses import dataclass, field
 
 from core.agents.base import AgentContext
+from core.agents.context import build_context
 from core.config import Settings, get_settings
 from core.events import EventBus
 from core.llm import ChatMessage, ModelRouter
@@ -21,7 +22,6 @@ from core.orchestrator.approvals import ApprovalGate
 from core.orchestrator.task_graph import Task, TaskGraph, TaskState
 from core.policy.engine import PolicyEngine
 from core.tools import ToolCall, ToolContext, ToolRegistry, build_default_registry
-from core.workspace import discover_workspace
 
 log = logging.getLogger("vajra.orchestrator")
 
@@ -72,19 +72,14 @@ class Orchestrator:
             return True
         return False
 
-    async def execute_goal(self, goal_id: str, goal: str, workspace_root: str) -> dict:
-        profile = discover_workspace(workspace_root)
-        memory = WorkspaceMemory(workspace_root)
-        summary = self._summarize(profile)
+    async def execute_goal(
+        self, goal_id: str, goal: str, workspace_root: str, *, focus: str = ""
+    ) -> dict:
+        # PRIORITY 18: focused, size-bounded context - never the whole repo.
+        ctx = await build_context(goal, workspace_root, focus=focus)
+        summary = ctx.workspace_summary
         await self.events.record(
             "goal.created", goal_id=goal_id, goal=goal, workspace=workspace_root, stack=summary
-        )
-
-        ctx = AgentContext(
-            goal=goal,
-            workspace_root=workspace_root,
-            workspace_summary=summary,
-            memory_context=memory.recent_context(),
         )
         graph = await self.planner.create_task_graph(
             goal_id, ctx, max_retries=self.settings.vajra_max_retries
@@ -154,6 +149,7 @@ class Orchestrator:
             "changed_files": sorted(set(changed_files)),
             "tasks": [t.model_dump() for t in graph.tasks],
         }
+        memory = WorkspaceMemory(workspace_root)
         self._learn(memory, graph, succeeded)
         memory.record_task(goal, "passed" if succeeded else "failed", result["changed_files"])
         await self.events.record(

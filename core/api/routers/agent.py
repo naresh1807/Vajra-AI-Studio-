@@ -38,10 +38,10 @@ async def agent_chat(req: ChatRequest) -> ChatResponse:
     )
 
 
-async def _run_goal(goal_id: str, text: str, workspace_root: str) -> None:
+async def _run_goal(goal_id: str, text: str, workspace_root: str, focus: str = "") -> None:
     await db.set_goal_status(goal_id, "running")
     try:
-        result = await orchestrator.execute_goal(goal_id, text, workspace_root)
+        result = await orchestrator.execute_goal(goal_id, text, workspace_root, focus=focus)
         await db.set_goal_status(goal_id, "passed" if result["succeeded"] else "failed")
     except Exception:  # noqa: BLE001
         log.exception("agent run %s crashed", goal_id)
@@ -60,7 +60,9 @@ async def agent_run(req: AgentRunRequest) -> AgentRunStatus:
         raise HTTPException(400, "workspace_root or a known project_id is required")
     goal_id = await db.create_goal(req.goal, req.project_id)
     if req.autostart:
-        running[goal_id] = asyncio.create_task(_run_goal(goal_id, req.goal, workspace_root))
+        running[goal_id] = asyncio.create_task(
+            _run_goal(goal_id, req.goal, workspace_root, req.focus)
+        )
     return AgentRunStatus(id=goal_id, goal=req.goal, status="running" if req.autostart else "pending")
 
 

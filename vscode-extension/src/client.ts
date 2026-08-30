@@ -98,10 +98,10 @@ export class VajraClient {
       body: JSON.stringify({ message, history, workspace_root: root }),
     });
 
-  startRun = (goal: string, root: string) =>
+  startRun = (goal: string, root: string, focus = "") =>
     this.j<RunStatus>("/api/agent/run", {
       method: "POST",
-      body: JSON.stringify({ goal, workspace_root: root, autostart: true }),
+      body: JSON.stringify({ goal, workspace_root: root, autostart: true, focus }),
     });
   runStatus = (id: string) => this.j<RunStatus>(`/api/agent/runs/${id}`);
   stopRun = (id: string) =>

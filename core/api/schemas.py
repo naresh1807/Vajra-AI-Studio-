@@ -190,6 +190,7 @@ class AgentRunRequest(BaseModel):
     workspace_root: str | None = None
     project_id: str | None = None
     autostart: bool = True
+    focus: str = ""  # currently-open file / selection the client wants prioritized (P18)
 
 
 class AgentRunStatus(BaseModel):

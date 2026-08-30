@@ -29,7 +29,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P15 | Test explorer | 🟢 | `core/runtime/testing.py` + `/api/testing/*`; extension `TestController`; `test_testing.py` |
 | P16 | Debugger (DAP) | 🟢 | `core/dap/`; `test_dap.py` — launch/breakpoints/step/vars live |
 | P17 | Model router hardening | 🟢 | `test_model_router.py` (8): retry, fallback, 429, circuit breaker, cancellation, metrics |
-| P18 | Agent context management | 🟡 | RAG retrieval + workspace summary feed the agents; not tuned per-symbol |
+| P18 | Agent context management | 🟢 | `core/agents/context.py` `build_context()`: task→semantic-search→diff→editor-focus→memory→summary, each size-capped (retrieved 6k / diff 4k / focus 4k), best-effort. `AgentContext.prompt_context()` assembles it; orchestrator + planner + every specialist use it. `/api/agent/run` takes `focus`. `tests/test_agent_context.py` |
 | P19 | Memory / RAG | 🟢 | `core/rag/`; `test_rag.py`; auto-reindex on project open |
 | P20 | Secret protection | 🟢 | `events.redact()`; `secret_scan`; `test_security.py` |
 | P21 | Terminal security (human vs AI) | 🟢 | `/api/terminal/run` = shell; `run_command` tool = argv-only; `test_terminal.py` |

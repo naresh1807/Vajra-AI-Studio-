@@ -92,7 +92,7 @@ export class VajraChatView implements vscode.WebviewViewProvider {
       if (mode === "agent") {
         if (!root) return this.post({ type: "bubble", bubble: { role: "system", text: "Open a folder first." } });
         await this.client.openProject(root);
-        const run = await this.client.startRun(text, root);
+        const run = await this.client.startRun(text, root, this.ctxLine());
         this.post({ type: "bubble", bubble: { role: "system", text: `Run ${run.id} started` } });
         this.startPoll(() => this.client.runStatus(run.id), run.id, true);
         return;

@@ -37,7 +37,7 @@ class PlannerAgent(Agent):
             ChatMessage(role="system", content=self.system_prompt + "\n" + schema_hint),
             ChatMessage(
                 role="user",
-                content=f"Goal: {ctx.goal}\n\nWorkspace:\n{ctx.workspace_summary}\n\n{schema_hint}",
+                content=f"Goal: {ctx.goal}\n\n{ctx.prompt_context()}\n\n{schema_hint}",
             ),
         ]
         try:

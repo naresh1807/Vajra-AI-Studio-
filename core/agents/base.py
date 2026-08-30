@@ -19,7 +19,24 @@ class AgentContext(BaseModel):
     workspace_summary: str = ""
     memory_context: str = ""
     task_instruction: str = ""
+    retrieved: str = ""        # RAG: code most relevant to the goal (P18)
+    working_diff: str = ""     # uncommitted changes (what "fix X" is about)
+    focus: str = ""            # the client's currently-open file / selection
     scratch: dict = {}
+
+    def prompt_context(self) -> str:
+        parts = []
+        if self.workspace_summary:
+            parts.append(f"# Project\n{self.workspace_summary}")
+        if self.focus:
+            parts.append(f"# Open in the editor\n{self.focus}")
+        if self.working_diff:
+            parts.append(f"# Uncommitted changes\n```diff\n{self.working_diff[:4000]}\n```")
+        if self.retrieved:
+            parts.append(f"# Relevant code (retrieved)\n{self.retrieved}")
+        if self.memory_context:
+            parts.append(f"# Project memory\n{self.memory_context}")
+        return "\n\n".join(parts)
 
 
 class AgentAction(BaseModel):
@@ -51,14 +68,15 @@ class Agent(ABC):
         return specs
 
     def _build_messages(self, ctx: AgentContext, history: list[ChatMessage]) -> list[ChatMessage]:
+        context_block = ctx.prompt_context() or "(not yet profiled)"
         preamble = (
             f"{self.system_prompt}\n\n"
             f"# Goal\n{ctx.goal}\n\n"
-            f"# Workspace\n{ctx.workspace_summary or '(not yet profiled)'}\n\n"
-            f"# Project memory\n{ctx.memory_context or '(empty)'}\n\n"
+            f"{context_block}\n\n"
             f"# Your task\n{ctx.task_instruction}\n\n"
-            "Propose tool calls to make progress. When the task's success criteria are met, "
-            "reply with a short final summary and no tool calls."
+            "Propose tool calls to make progress. Prefer the retrieved/open context above over "
+            "re-reading the whole tree. When the task's success criteria are met, reply with a "
+            "short final summary and no tool calls."
         )
         return [ChatMessage(role="system", content=preamble), *history]
 

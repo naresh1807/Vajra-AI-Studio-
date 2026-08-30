@@ -4,6 +4,7 @@ from core.api.routers import (
     agent,
     approvals,
     assist,
+    auth,
     computer,
     debug,
     files,
@@ -23,6 +24,7 @@ from core.api.routers import (
 
 ALL = [
     health.router,
+    auth.router,
     setup.router,
     projects.router,
     files.router,

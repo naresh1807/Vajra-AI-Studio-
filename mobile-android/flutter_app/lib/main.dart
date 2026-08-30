@@ -40,10 +40,9 @@ class _HomeState extends State<Home> {
   bool paired = false;
   int tab = 0;
   final urlC = TextEditingController();
-  final tokC = TextEditingController();
-  final pinC = TextEditingController();
-  bool pinMode = true;
+  final pwC = TextEditingController();
   bool pairing = false;
+  String pairErr = '';
   final cmpC = TextEditingController();
   final goalC = TextEditingController();
   List<dynamic> projects = [];
@@ -55,12 +54,11 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    api.load().then((_) {
+    api.load().then((_) async {
       urlC.text = api.baseUrl;
-      tokC.text = api.token;
-      if (api.baseUrl.isNotEmpty && api.token.isNotEmpty) {
-        pinMode = false;
-        _pair();
+      // Already have a token from a previous login? verify it, skip the password.
+      if (api.baseUrl.isNotEmpty && api.token.isNotEmpty && await api.ping()) {
+        await _enter();
       }
     });
   }
@@ -69,30 +67,36 @@ class _HomeState extends State<Home> {
   void dispose() {
     _poll?.cancel();
     urlC.dispose();
-    tokC.dispose();
-    pinC.dispose();
+    pwC.dispose();
     cmpC.dispose();
     goalC.dispose();
     super.dispose();
   }
 
+  Future<void> _enter() async {
+    setState(() => paired = true);
+    projects = await api.projects().catchError((_) => []);
+    _poll = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+  }
+
   Future<void> _pair() async {
-    setState(() => pairing = true);
+    setState(() {
+      pairing = true;
+      pairErr = '';
+    });
     try {
-      if (pinMode && pinC.text.trim().isNotEmpty) {
-        await api.redeemPin(urlC.text, pinC.text, 'Vajra Mobile');
-      } else {
-        await api.save(urlC.text, tokC.text);
-      }
-      if (!await api.ping()) {
-        _snack(pinMode ? 'Pairing did not stick — check the PIN and URL' : 'Could not connect / bad token');
+      if (!await api.passwordConfigured(urlC.text)) {
+        setState(() => pairErr = 'No password set on the PC yet — open Vajra there and run "Vajra: Set Password".');
         return;
       }
-      setState(() => paired = true);
-      projects = await api.projects().catchError((_) => []);
-      _poll = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+      await api.login(urlC.text, pwC.text, 'Vajra Mobile');
+      if (!await api.ping()) {
+        setState(() => pairErr = 'Logged in but the token was rejected — try again.');
+        return;
+      }
+      await _enter();
     } catch (e) {
-      _snack('$e');
+      setState(() => pairErr = '$e'.replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => pairing = false);
     }
@@ -161,35 +165,35 @@ class _HomeState extends State<Home> {
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Text('Pair with your PC', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text('Log in to your PC', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: true, label: Text('PIN')),
-                  ButtonSegment(value: false, label: Text('Token')),
-                ],
-                selected: {pinMode},
-                onSelectionChanged: (s) => setState(() => pinMode = s.first),
+              TextField(
+                controller: urlC,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(labelText: 'PC address', hintText: 'http://192.168.0.105:8760'),
               ),
-              const SizedBox(height: 16),
-              TextField(controller: urlC, decoration: const InputDecoration(hintText: 'http://192.168.1.20:8760')),
               const SizedBox(height: 10),
-              if (pinMode)
-                TextField(
-                  controller: pinC,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  decoration: const InputDecoration(
-                    hintText: '6-digit code',
-                    helperText: 'On the PC: Vajra: Pair a Phone',
-                  ),
-                )
-              else
-                TextField(controller: tokC, decoration: const InputDecoration(hintText: 'device secret / paired token')),
+              TextField(
+                controller: pwC,
+                obscureText: true,
+                onSubmitted: (_) => pairing ? null : _pair(),
+                decoration: const InputDecoration(labelText: 'Vajra password'),
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: pairing ? null : _pair,
-                child: Text(pairing ? 'Pairing…' : 'Connect'),
+                child: Text(pairing ? 'Logging in…' : 'Log in'),
+              ),
+              if (pairErr.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(pairErr, style: const TextStyle(color: Colors.redAccent)),
+              ],
+              const SizedBox(height: 12),
+              const Text(
+                'Set the password on the PC: Studio → "Vajra: Set Password", '
+                'or VAJRA_PASSWORD in .env.',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
               ),
             ]),
           ),

@@ -155,19 +155,36 @@ export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, 
     vscode.commands.registerCommand("vajra.run", () => runProject(client, root(), "run")),
     vscode.commands.registerCommand("vajra.build", () => runProject(client, root(), "build")),
     vscode.commands.registerCommand("vajra.test", () => runProject(client, root(), "test")),
-    vscode.commands.registerCommand("vajra.pairPhone", async () => {
+    vscode.commands.registerCommand("vajra.setPassword", async () => {
       try {
-        const p = await client.pairingPin();
-        const mins = Math.round((p.expires_in || 300) / 60);
+        const st = await client.authStatus();
+        let current = "";
+        if (st.configured) {
+          const c = await vscode.window.showInputBox({
+            password: true,
+            prompt: "Current Vajra password (leave blank if VAJRA_PASSWORD is set in .env)",
+          });
+          if (c === undefined) return;
+          current = c;
+        }
+        const next = await vscode.window.showInputBox({
+          password: true,
+          prompt: "New Vajra password (min 6 chars) — phones and other machines log in with this",
+          validateInput: (v) => (v.trim().length >= 6 ? null : "at least 6 characters"),
+        });
+        if (!next) return;
+        if (st.configured) await client.changePassword(current, next);
+        else await client.authSetup(next);
         const pick = await vscode.window.showInformationMessage(
-          `Pair a phone: open ${p.connect.url}/mobile (or the Vajra Mobile app) on the same Wi-Fi and enter PIN ${p.pin} — valid ${mins} min.`,
-          "Copy PIN",
-          "Copy URL",
+          "Vajra password set. On the phone, open the Vajra Mobile app (or a browser to the URL below) and log in.",
+          "Copy phone URL",
         );
-        if (pick === "Copy PIN") await vscode.env.clipboard.writeText(p.pin);
-        if (pick === "Copy URL") await vscode.env.clipboard.writeText(`${p.connect.url}/mobile`);
+        if (pick === "Copy phone URL") {
+          const base = vscode.workspace.getConfiguration("vajra").get<string>("apiUrl", "");
+          await vscode.env.clipboard.writeText(base.replace("127.0.0.1", "<your-PC-Wi-Fi-IP>"));
+        }
       } catch (e) {
-        void vscode.window.showErrorMessage(`Vajra: could not get a pairing PIN — ${e}`);
+        void vscode.window.showErrorMessage(`Vajra: ${e}`);
       }
     }),
   );

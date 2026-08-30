@@ -44,13 +44,12 @@ MOBILE_HTML = """<!doctype html>
 <header><span id="dot" class="dot"></span><b>VAJRA</b> Mobile <span id="ver" class="muted"></span></header>
 <main>
   <section id="pair" class="card">
-    <h3>Pair with your PC</h3>
+    <h3>Log in to your PC</h3>
     <input id="url" placeholder="http://192.168.1.20:8760" inputmode="url"/>
-    <input id="pin" placeholder="6-digit PIN (on the PC: Vajra: Pair a Phone)" inputmode="numeric" maxlength="6" style="margin-top:8px"/>
-    <div class="muted" style="margin-top:6px">…or paste a device token instead of a PIN:</div>
-    <input id="tok" placeholder="device secret / paired token" style="margin-top:4px"/>
-    <button onclick="pair()">Connect</button>
+    <input id="pw" type="password" placeholder="Vajra password" style="margin-top:8px"/>
+    <button onclick="pair()">Log in</button>
     <div id="pairErr" class="muted" style="color:var(--bad);margin-top:6px"></div>
+    <div class="muted" style="margin-top:6px">Set the password on the PC: Studio → <b>Vajra: Set Password</b>, or <code>VAJRA_PASSWORD</code> in <code>.env</code>.</div>
   </section>
 
   <section id="viewNew" hidden>
@@ -81,29 +80,28 @@ MOBILE_HTML = """<!doctype html>
 <script>
 const S = { url:"", tok:"", runs:[] };
 try{ const s=JSON.parse(localStorage.getItem("vajra.mobile")||"{}"); S.url=s.url||""; S.tok=s.tok||""; }catch(e){}
-url.value=S.url; tok.value=S.tok;
+url.value=S.url;
 
+function norm(u){ u=(u||"").trim().replace(/[/]+$/,""); return u && u.indexOf("://")<0 ? "http://"+u : u; }
 function h(){ return {"X-Vajra-Token":S.tok,"Content-Type":"application/json"}; }
 async function api(path, opts){ const r=await fetch(S.url+path, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 
 async function pair(){
-  S.url=url.value.replace(/\\/+$/,""); pairErr.textContent="";
-  const pinv=(pin.value||"").trim();
+  S.url=norm(url.value); pairErr.textContent="";
+  const pwv=(pw.value||"");
   try{
     const hp=await fetch(S.url+"/api/health"); const j=await hp.json();
     ver.textContent=j.version||"";
-    if(pinv){
-      const r=await fetch(S.url+"/api/pairing/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:pinv,name:"Vajra Mobile (web)"})});
-      if(!r.ok) throw new Error("bad or expired PIN");
-      S.tok=(await r.json()).token;
-    }else{
-      S.tok=tok.value.trim();
-    }
+    const st=await (await fetch(S.url+"/api/auth/status")).json();
+    if(!st.configured){ pairErr.textContent="No password set on the PC yet — set one in Studio (Vajra: Set Password)."; return; }
+    const r=await fetch(S.url+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:pwv,name:"Vajra Mobile (web)"})});
+    if(!r.ok) throw new Error(r.status===429 ? "too many attempts, wait a minute" : "wrong password");
+    S.tok=(await r.json()).token;
     await api("/api/ping",{headers:h()});
     localStorage.setItem("vajra.mobile",JSON.stringify({url:S.url,tok:S.tok}));
     dot.classList.add("ok"); pair.hidden=true; tabs.hidden=false; tab("New");
     loadProjects(); setInterval(poll, 2000);
-  }catch(e){ pairErr.textContent="Could not pair — check the URL and PIN/token."; }
+  }catch(e){ if(!pairErr.textContent) pairErr.textContent="Could not log in — "+e.message; }
 }
 
 async function loadProjects(){
@@ -180,7 +178,13 @@ function tab(v){
   viewNew.hidden=v!=="New"; viewTasks.hidden=v!=="Tasks"; viewApprovals.hidden=v!=="Approvals";
   if(v==="Tasks") renderTasks();
 }
-if(S.url && S.tok) pair();
+// already have a token from a previous login? verify it and skip the password.
+if(S.url && S.tok){ (async()=>{ try{
+  await api("/api/ping",{headers:h()});
+  const j=await (await fetch(S.url+"/api/health")).json(); ver.textContent=j.version||"";
+  dot.classList.add("ok"); pair.hidden=true; tabs.hidden=false; tab("New");
+  loadProjects(); setInterval(poll,2000);
+}catch(e){ /* token stale - fall back to the login form */ } })(); }
 </script>
 </body></html>
 """

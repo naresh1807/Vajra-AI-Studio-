@@ -90,7 +90,7 @@ llama.cpp). Swapping providers needs no agent-code changes.
 | Computer agent | 🟢 | files/apps/PowerShell outside the workspace, approval-gated |
 | OS-development agent | 🟢 | builds + boots a real multiboot kernel in QEMU, reads serial, iterates |
 | Authorized-security agent | 🟢 | scope-gated defensive audits + connect-only checks, no offense |
-| Device pairing + security hardening | 🟡 | random device secret, one-time PIN pairing, CORS lockdown, rate limit, `/api/v1` |
+| Device auth + security hardening | 🟡 | random device secret (same machine), password login for phones/remote (`/api/auth/*`, brute-force lockout), CORS lockdown, rate limit, `/api/v1` |
 | **Vajra AI Studio** (Code-OSS fork) | 🟡 | builds + launches, Vajra extension loads as a built-in; full GUI QA pending |
 | Vajra extension (chat/assist/tests/…) | 🟡 | `tsc` clean, every endpoint verified vs the Core; not click-tested in an Ext Host |
 | Vajra Mobile (Android) | 🟡 | `GET /mobile` LAN page 🟢; native APK builds 🟡; secure QR pairing 🔵 |

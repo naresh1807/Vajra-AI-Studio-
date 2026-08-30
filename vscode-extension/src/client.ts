@@ -117,10 +117,18 @@ export class VajraClient {
       body: JSON.stringify({ root, target }),
     });
 
-  pairingPin = () =>
-    this.j<{ device_id: string; pin: string; expires_in: number; connect: { url: string } }>(
-      "/api/pairing/pin",
-    );
+  authStatus = () =>
+    this.j<{ configured: boolean; device_id: string }>("/api/auth/status").catch(() => ({
+      configured: false,
+      device_id: "",
+    }));
+  authSetup = (password: string) =>
+    this.j<{ ok: boolean }>("/api/auth/setup", { method: "POST", body: JSON.stringify({ password }) });
+  changePassword = (current: string, next: string) =>
+    this.j<{ ok: boolean }>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current, new: next }),
+    });
 
   approvals = () => this.j<Approval[]>("/api/approvals").catch(() => [] as Approval[]);
   resolveApproval = (id: string, verdict: "approved" | "rejected") =>

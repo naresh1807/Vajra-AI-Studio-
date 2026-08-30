@@ -109,8 +109,10 @@ def run() -> None:
                 f"auto-generated device secret, or set a strong one.\nsecret: {ident.device_secret}"
             )
         log.warning("Vajra Core is LAN-bound (0.0.0.0). Only do this on a trusted network.")
-        log.info("pair a phone with PIN: GET /api/pairing/pin  |  or device secret: %s", ident.device_secret)
-    log.info("device %s  |  pair a phone: GET /api/pairing/pin", ident.device_id)
+        if not ident.password_configured():
+            log.warning("No login password set. Set one in Studio, or VAJRA_PASSWORD in .env.")
+    status = "password set" if ident.password_configured() else "NO password - phones cannot log in"
+    log.info("device %s  |  login: POST /api/auth/login  |  %s", ident.device_id, status)
     uvicorn.run("core.api.main:app", host=host, port=settings.vajra_port, reload=False)
 
 

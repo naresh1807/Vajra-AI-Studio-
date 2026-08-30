@@ -3,7 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Thin client for the Vajra Local API (/api/*), same routes the desktop and
-/// VS Code clients use. All calls carry the pairing token.
+/// VS Code clients use. Log in once with the desktop password; every later call
+/// carries the per-device token that login returned.
 class VajraApi {
   String baseUrl = '';
   String token = '';
@@ -14,8 +15,14 @@ class VajraApi {
     token = p.getString('vajra.token') ?? '';
   }
 
+  static String normalizeUrl(String url) {
+    var u = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (u.isNotEmpty && !u.startsWith(RegExp(r'https?://'))) u = 'http://$u';
+    return u;
+  }
+
   Future<void> save(String url, String tok) async {
-    baseUrl = url.replaceAll(RegExp(r'/+$'), '');
+    baseUrl = normalizeUrl(url);
     token = tok.trim();
     final p = await SharedPreferences.getInstance();
     await p.setString('vajra.url', baseUrl);
@@ -48,17 +55,25 @@ class VajraApi {
   Future<Map<String, dynamic>> health() =>
       http.get(Uri.parse('$baseUrl/api/health')).then((r) => jsonDecode(r.body) as Map<String, dynamic>);
 
-  /// PIN pairing: the desktop shows a 6-digit code (Vajra: Pair a Phone), the
-  /// phone redeems it here — unauthenticated — for its own per-device token,
-  /// which is then persisted. No shared secret is ever typed on the phone.
-  Future<void> redeemPin(String url, String pin, String name) async {
-    final base = url.replaceAll(RegExp(r'/+$'), '');
+  /// Whether the desktop Core has a login password set yet.
+  Future<bool> passwordConfigured(String url) async {
+    final base = normalizeUrl(url);
+    final r = await http.get(Uri.parse('$base/api/auth/status'));
+    if (r.statusCode >= 400) throw Exception('${r.statusCode} ${r.body}');
+    return (jsonDecode(r.body) as Map<String, dynamic>)['configured'] == true;
+  }
+
+  /// Log in with the password set on the desktop; store the per-device token.
+  Future<void> login(String url, String password, String name) async {
+    final base = normalizeUrl(url);
     final r = await http.post(
-      Uri.parse('$base/api/pairing/redeem'),
+      Uri.parse('$base/api/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'pin': pin.trim(), 'name': name}),
+      body: jsonEncode({'password': password, 'name': name}),
     );
-    if (r.statusCode >= 400) throw Exception('pairing failed: ${r.statusCode} ${r.body}');
+    if (r.statusCode == 429) throw Exception('too many attempts — wait a minute');
+    if (r.statusCode == 401) throw Exception('wrong password');
+    if (r.statusCode >= 400) throw Exception('${r.statusCode} ${r.body}');
     final tok = (jsonDecode(r.body) as Map<String, dynamic>)['token'] as String;
     await save(base, tok);
   }

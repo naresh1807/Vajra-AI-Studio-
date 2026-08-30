@@ -11,7 +11,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 
 | | Priority | State | Evidence |
 |---|---|---|---|
-| P0 | Secure pairing (random device secret, PIN, revocation) | 🟢 | `test_pairing.py` (10) + live: `change-me-local-only` rejected, PIN pair→token→revoke over HTTP |
+| P0 | Secure auth (random device secret, password login, revocation) | 🟢 | `test_pairing.py` + live: `change-me-local-only` rejected, scrypt password → per-device token → revoke over HTTP, login lockout |
 | P1 | `/api/v1` stable alias | 🟢 | `test_pairing.py::test_api_v1_alias` |
 | P2 | API split into `deps.py` + `routers/*` | 🟢 | `main.py` 1029→111 lines; 176 tests unchanged |
 | P3 | Device credentials | 🟢 | `core/security/pairing.py` + tests |
@@ -36,7 +36,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P21 | Terminal security (human vs AI) | 🟢 | `/api/terminal/run` = shell (human); `run_command` tool = argv-only (AI) + policy `_HIGH_RISK_MARKERS` (pipe-to-shell, sudo, `rm -rf`, `git clean -fdx`, `dd`, `-g` installs) → approval; routine `pip install`/`npm ci`/`pytest` run free. `test_terminal.py`, `test_policy.py` |
 | P22 | Computer agent | 🟢 | verified live: "create a folder on the Desktop" → approval → created |
 | P23 | High-risk approval | 🟢 | `ApprovalGate` + CRITICAL blocklist now covers the full P23 list: format/wipe, boot config, shutdown/reboot, firewall + AV disable, git force-push / `reset --hard origin`, drop-database, credential + privilege changes. `test_policy.py` (16, incl. a param sweep); `test_concurrency.py` (expiry) |
-| P24-25 | Android companion + pairing | 🟡 | `GET /mobile` page + native APK both do PIN pairing (`/api/pairing/redeem`) or raw token; desktop `Vajra: Pair a Phone` shows the PIN + LAN URL. `test_pairing.py::test_pairing_pin_flow_over_http` + Flutter widget tests. **Not run on a physical device** |
+| P24-25 | Android companion + login | 🟡 | `GET /mobile` page + native APK both log in with the desktop password (`/api/auth/login` → per-device token, brute-force lockout). Desktop `Vajra: Set Password`. `test_pairing.py` (login flow + lockout) + Flutter widget/unit tests. **Not run on a physical device** |
 | P26 | OS development mode | 🟢 | verified live: built + booted `examples/tiny-kernel` in QEMU, read `VAJRA-KERNEL-OK` off serial |
 | P27 | Security engineering mode | 🟢 | scope-gated; verified live: self-audit of this repo |
 | P28 | Observability | 🟢 | every plan/tool/patch/test emits a structured event; DB + `logs/*.jsonl` |
@@ -64,8 +64,8 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
    run live against Nemotron on a broken pytest project: tester→debugger→coder→
    tester→reviewer(APPROVED)→git, bounded retries, final gate green.
 3. **Mobile control** (connect → select project → "run tests" → results → approve):
-   🟡 — the `GET /mobile` web page does the whole flow today over LAN (PIN or
-   token pairing); the native APK builds and its pairing + task/approval code is
+   🟡 — the `GET /mobile` web page does the whole flow today over LAN (password
+   login); the native APK builds and its login + task/approval code is
    unit-tested, but it has not been installed on a physical device.
 4. **OS development** (edit → build → boot QEMU → capture output → patch → rebuild):
    🟢 — verified live end-to-end with `examples/tiny-kernel` and the OS-dev agent.

@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     #: leave empty -> the Core uses the strong random secret in data/device.json.
     #: override only with a long random value of your own.
     vajra_pairing_token: str = ""
+    #: optional - set a login password without the first-run wizard. Overrides
+    #: any password set in the UI. Clients log in with this to get a token.
+    vajra_password: str = ""
     vajra_max_retries: int = 2
     vajra_autonomy_enabled: bool = True
 

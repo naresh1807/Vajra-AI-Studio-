@@ -46,7 +46,9 @@ npm run dev        # browser UI on http://localhost:1420
 npm run tauri dev  # native window
 ```
 
-**Settings** → set the pairing token to match `.env` → **Open Folder**.
+On the same machine no token is needed (the Core's device secret is read from
+`data/device.json`). From a phone or another machine, set a password with
+**Vajra: Set Password** and log in with it.
 
 ## 4. VS Code extension (optional)
 

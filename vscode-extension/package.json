@@ -28,7 +28,7 @@
       { "command": "vajra.showCoreLog", "title": "Vajra: Show Core Log" },
       { "command": "vajra.healthCheck", "title": "Vajra: Health Check" },
       { "command": "vajra.firstRun", "title": "Vajra: First-time Setup" },
-      { "command": "vajra.pairPhone", "title": "Vajra: Pair a Phone" },
+      { "command": "vajra.setPassword", "title": "Vajra: Set Password (for phone / remote login)" },
       { "command": "vajra.run", "title": "Vajra: Run Project", "icon": "$(play)" },
       { "command": "vajra.build", "title": "Vajra: Build Project" },
       { "command": "vajra.test", "title": "Vajra: Run Tests" },
@@ -108,7 +108,7 @@
         "vajra.pairingToken": {
           "type": "string",
           "default": "",
-          "description": "Pairing token for the local Vajra Core. Leave blank when the Core is auto-started from the same machine (it reads data/device.json directly); set the device secret or a paired-device token to connect from elsewhere."
+          "description": "Auth token for the Vajra Core. Leave blank on the same machine (the Core is auto-started and its device secret is read from data/device.json). To connect to a Core on another machine, log in there once and paste the token, or set the device secret."
         },
         "vajra.inlineCompletions": {
           "type": "boolean",

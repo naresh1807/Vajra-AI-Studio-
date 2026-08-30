@@ -21,15 +21,15 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P7 | Assisted coding (explain/fix/…/diff) | 🟡 | `/api/assist` + `test_assist_agent.py`; extension `assist.ts` uses native diff; **not click-tested** |
 | P8 | Autonomous agent loop | 🟢 | earlier: verified live vs Nemotron — greenfield app + a real bug-fix, 6/6 tasks, commit+tag |
 | P9 | Human+AI collab / no silent clobber | 🟢 | `/api/files/write` 409 (`test_api.py`); agent `ToolContext.file_shas` (`test_fs_conflict.py`) |
-| P10 | Diff system | 🟡 | `/api/files/diff`, `/api/git/diff`, checkpoints/restore; **per-hunk accept/reject UI not built** |
+| P10 | Diff system | 🟢 | `/api/files/diff`, `/api/git/diff`, checkpoints/restore; per-hunk apply below |
 | P11 | Checkpoint & rollback | 🟢 | `core/runtime/git.py` `vajra/*` tags; `/api/git/{checkpoint,checkpoints,rollback}`; `test_git.py` |
 | P12 | Language architecture (LSP/DAP/packs) | 🟢 | 17 languages resolve; `test_lsp.py` — clangd/gopls/json diagnostics live |
 | P13 | Framework detection | 🟢 | `core/workspace/discovery.py`; `test_workspace.py` |
-| P14 | Run system | 🟡 | run command inferred by discovery; used by the Tester agent |
+| P14 | Run system | 🟢 | `core/runtime/runner.py` `plan(root,kind)` + `/api/run/{plan,start}`; `test_discovery_run.py`; extension `Vajra: Run/Build/Test Project` |
 | P15 | Test explorer | 🟢 | `core/runtime/testing.py` + `/api/testing/*`; extension `TestController`; `test_testing.py` |
 | P16 | Debugger (DAP) | 🟢 | `core/dap/`; `test_dap.py` — launch/breakpoints/step/vars live |
 | P17 | Model router hardening | 🟢 | `test_model_router.py` (8): retry, fallback, 429, circuit breaker, cancellation, metrics |
-| P10 | Per-hunk diff review | 🟢 | `vscode-extension/src/hunks.ts` LCS line-diff → hunks + `applyHunks(subset)`; Assisted "Apply hunk-by-hunk…" QuickPick (canPickMany) builds a partial `WorkspaceEdit`. Full merge-editor UI still needs a GUI session. |
+| P10+ | Per-hunk diff review | 🟢 | `vscode-extension/src/hunks.ts` LCS line-diff → hunks + `applyHunks(subset)`; Assisted "Apply hunk-by-hunk…" QuickPick (canPickMany) builds a partial `WorkspaceEdit`. Full merge-editor UI still needs a GUI session. |
 | P18 | Agent context management | 🟢 | `core/agents/context.py` `build_context()`: task→semantic-search→diff→editor-focus→memory→summary, each size-capped (retrieved 6k / diff 4k / focus 4k), best-effort. `AgentContext.prompt_context()` assembles it; orchestrator + planner + every specialist use it. `/api/agent/run` takes `focus`. `tests/test_agent_context.py` |
 | P19 | Memory / RAG | 🟢 | `core/rag/`; `test_rag.py`; auto-reindex on project open |
 | P20 | Secret protection | 🟢 | `events.redact()`; `secret_scan`; `test_security.py` |
@@ -43,7 +43,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P29 | Task cancellation | 🟢 | `orchestrator.cancel()`; `/api/agent/stop`; `test_model_router.py::test_cancellation_propagates` |
 | P30 | Crash recovery | 🟢 | `db.mark_interrupted_goals()` on startup; `/api/agent/interrupted`; `test_crash_recovery.py` |
 | P31 | CI/CD | 🟡 | `.github/workflows/ci.yml` — will run on first PR |
-| P32 | Security edge-case tests | 🟡 | path escapes 🟢, approval expiry 🟢, concurrency 🟢; huge/binary files, provider outage in prod ⚪ |
+| P32 | Security edge-case tests | 🟢 | path escapes, approval expiry, concurrency, circuit breaker; huge-file truncation + binary-file flag (`test_files_edge.py`); provider-outage fallback (`test_model_router.py`) |
 | P33 | Windows installer | 🟢 | `studio\build.ps1 -Setup` → `VajraAIStudioSetup-x64.exe` (built, 260 MB) |
 | P34 | Android APK | 🟢 | `scripts\build-apk.ps1` → `VajraMobile.apk` (built, 48 MB) |
 | P35 | First-run wizard | 🟢 | `/api/setup/*`; extension `Vajra: First-time Setup` + walkthrough; `test_doctor_setup.py` |
@@ -71,4 +71,5 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 
 - Click-through of P6/P7/P8 in the running Studio (Extension Development Host)
 - Installing `VajraMobile.apk` on an Android phone and pairing it
-- Per-hunk diff accept/reject UI (P10) — endpoint exists, merge-editor UI does not
+- Full 3-way merge-editor UI (P10) — per-hunk QuickPick apply ships in the
+  extension; the inline merge-editor view still needs a GUI session

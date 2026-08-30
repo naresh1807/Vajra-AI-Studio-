@@ -44,6 +44,7 @@ class FileContent(BaseModel):
     bytes: int
     encoding: str = "utf-8"
     truncated: bool = False
+    binary: bool = False  # NUL byte seen - `content` is a lossy decode, do not edit
     sha256: str = ""  # of `content`; pass back as base_sha to a later write
 
 
@@ -176,9 +177,12 @@ def read_file(root: str | Path, rel: str) -> FileContent:
         raise WorkspaceError(f"not a file: {rel}")
     raw = target.read_bytes()
     truncated = len(raw) > _MAX_READ_BYTES
-    text = raw[:_MAX_READ_BYTES].decode("utf-8", errors="replace")
+    head = raw[:_MAX_READ_BYTES]
+    binary = b"\x00" in head[:65536]
+    text = head.decode("utf-8", errors="replace")
     return FileContent(
-        path=rel, content=text, bytes=len(raw), truncated=truncated, sha256=sha(text)
+        path=rel, content=text, bytes=len(raw), truncated=truncated,
+        binary=binary, sha256=sha(text),
     )
 
 

@@ -27,7 +27,13 @@ export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, 
   const refresh = async () => {
     try {
       const h = await client.health();
-      setState(h.status === "ok" ? "up" : "down", h.models?.primary ?? "");
+      let extra = h.models?.primary ?? "";
+      const m = await client.models().catch(() => null);
+      if (m?.primary) {
+        const c = m.primary.circuit === "open" ? " ⚠ primary circuit open" : "";
+        extra += `\n${m.primary.requests} req · ${m.primary.failures} fail · ${m.primary.avg_latency_ms}ms${c}`;
+      }
+      setState(h.status === "ok" ? "up" : "down", extra);
     } catch {
       setState("down");
     }

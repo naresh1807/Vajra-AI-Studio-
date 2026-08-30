@@ -1,16 +1,24 @@
-"""Model router - the single interface agents call. Selects primary/fallback,
-retries transient errors, and keeps agents ignorant of provider details.
+"""Model router — the single interface agents call.
+
+Selects primary -> fallback, retries *transient* failures with backoff, honours
+429 Retry-After, trips a circuit breaker on a tier that keeps failing (so it
+stops wasting time on a dead provider), and records latency / token / error
+metrics. Agents stay ignorant of provider details.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from dataclasses import dataclass, field
 
 from core.config import ModelConfig, get_model_config
 from core.llm.nemotron_client import (
     ChatMessage,
     LLMClientError,
+    LLMPermanentError,
+    LLMRateLimited,
     LLMResponse,
     OpenAICompatClient,
     ToolSpec,
@@ -18,12 +26,62 @@ from core.llm.nemotron_client import (
 
 log = logging.getLogger("vajra.llm")
 
+_BREAKER_THRESHOLD = 4      # consecutive failures before the tier is skipped
+_BREAKER_COOLDOWN = 60.0    # seconds to skip it for
 
+
+@dataclass
+class _TierStats:
+    requests: int = 0
+    failures: int = 0
+    rate_limited: int = 0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    latency_ms_total: float = 0.0
+    consecutive_failures: int = 0
+    open_until: float = 0.0
+
+    def is_open(self) -> bool:
+        return time.monotonic() < self.open_until
+
+    def ok(self, latency_ms: float, usage: dict) -> None:
+        self.requests += 1
+        self.latency_ms_total += latency_ms
+        self.tokens_in += int(usage.get("prompt_tokens", 0) or 0)
+        self.tokens_out += int(usage.get("completion_tokens", 0) or 0)
+        self.consecutive_failures = 0
+        self.open_until = 0.0
+
+    def bad(self, *, rate_limited: bool = False) -> None:
+        self.requests += 1
+        self.failures += 1
+        if rate_limited:
+            self.rate_limited += 1
+        self.consecutive_failures += 1
+        if self.consecutive_failures >= _BREAKER_THRESHOLD:
+            self.open_until = time.monotonic() + _BREAKER_COOLDOWN
+            log.warning("circuit breaker: skipping this model tier for %ss", int(_BREAKER_COOLDOWN))
+
+    def as_dict(self) -> dict:
+        avg = round(self.latency_ms_total / self.requests, 1) if self.requests else 0.0
+        return {
+            "requests": self.requests, "failures": self.failures,
+            "rate_limited": self.rate_limited, "avg_latency_ms": avg,
+            "tokens_in": self.tokens_in, "tokens_out": self.tokens_out,
+            "circuit": "open" if self.is_open() else "closed",
+        }
+
+
+@dataclass
 class ModelRouter:
-    def __init__(self, config: ModelConfig | None = None) -> None:
-        self.config = config or get_model_config()
-        self._primary = OpenAICompatClient(self.config.primary)
-        self._fallback = OpenAICompatClient(self.config.fallback)
+    config: ModelConfig = field(default_factory=get_model_config)
+
+    def __post_init__(self) -> None:
+        self._clients = {
+            "primary": OpenAICompatClient(self.config.primary),
+            "fallback": OpenAICompatClient(self.config.fallback),
+        }
+        self._stats = {"primary": _TierStats(), "fallback": _TierStats()}
 
     @property
     def transient_attempts(self) -> int:
@@ -40,19 +98,52 @@ class ModelRouter:
         temperature: float = 0.2,
         max_tokens: int = 2048,
     ) -> LLMResponse:
-        for client, label in ((self._primary, "primary"), (self._fallback, "fallback")):
+        last_exc: Exception | None = None
+        for label in ("primary", "fallback"):
+            stats = self._stats[label]
+            if stats.is_open():
+                log.info("model %s: circuit open, skipping", label)
+                continue
+            client = self._clients[label]
             for attempt in range(1, self.transient_attempts + 1):
+                started = time.monotonic()
                 try:
-                    return await client.chat(messages, tools, temperature, max_tokens)
+                    resp = await client.chat(messages, tools, temperature, max_tokens)
+                    stats.ok((time.monotonic() - started) * 1000, resp.usage)
+                    return resp
+                except asyncio.CancelledError:
+                    raise
+                except LLMPermanentError as exc:
+                    stats.bad()
+                    last_exc = exc
+                    log.warning("model %s permanent error, moving on: %s", label, exc)
+                    break  # retrying a 4xx is pointless - go to the next tier
+                except LLMRateLimited as exc:
+                    stats.bad(rate_limited=True)
+                    last_exc = exc
+                    wait = exc.retry_after or self.backoff_seconds * attempt
+                    if attempt < self.transient_attempts:
+                        await asyncio.sleep(min(wait, 30.0))
                 except LLMClientError as exc:
+                    stats.bad()
+                    last_exc = exc
                     log.warning("model %s attempt %d failed: %s", label, attempt, exc)
                     if attempt < self.transient_attempts:
                         await asyncio.sleep(self.backoff_seconds * attempt)
             log.warning("model %s exhausted; trying next tier", label)
-        raise LLMClientError("primary and fallback model providers both unavailable")
+        raise LLMClientError(
+            f"primary and fallback model providers both unavailable: {last_exc}"
+        )
 
     def describe(self) -> dict[str, str]:
         return {
             "primary": f"{self.config.primary.provider}:{self.config.primary.model}",
             "fallback": f"{self.config.fallback.provider}:{self.config.fallback.model}",
+        }
+
+    def stats(self) -> dict:
+        return {
+            "models": self.describe(),
+            "primary": self._stats["primary"].as_dict(),
+            "fallback": self._stats["fallback"].as_dict(),
         }

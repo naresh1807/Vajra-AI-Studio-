@@ -53,7 +53,17 @@ class LLMResponse(BaseModel):
 
 
 class LLMClientError(RuntimeError):
-    pass
+    """Transient failure - safe to retry / fall back (timeout, 5xx, connect)."""
+
+
+class LLMPermanentError(LLMClientError):
+    """A 4xx that retrying won't fix (bad request, auth, model not found)."""
+
+
+class LLMRateLimited(LLMClientError):
+    def __init__(self, message: str, retry_after: float = 0.0) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class OpenAICompatClient:
@@ -85,11 +95,23 @@ class OpenAICompatClient:
             body["tool_choice"] = "auto"
 
         url = self.endpoint.base_url.rstrip("/") + "/chat/completions"
-        async with httpx.AsyncClient(timeout=self.endpoint.timeout_seconds) as client:
-            resp = await client.post(url, json=body, headers=headers)
-            if resp.status_code >= 400:
-                raise LLMClientError(f"{self.endpoint.provider} {resp.status_code}: {resp.text[:500]}")
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=self.endpoint.timeout_seconds) as client:
+                resp = await client.post(url, json=body, headers=headers)
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as exc:
+            raise LLMClientError(f"{self.endpoint.provider}: {type(exc).__name__}: {exc}") from exc
+
+        if resp.status_code == 429:
+            try:
+                retry_after = float(resp.headers.get("retry-after", "0"))
+            except ValueError:
+                retry_after = 0.0
+            raise LLMRateLimited(f"{self.endpoint.provider} rate limited", retry_after)
+        if 400 <= resp.status_code < 500:
+            raise LLMPermanentError(f"{self.endpoint.provider} {resp.status_code}: {resp.text[:500]}")
+        if resp.status_code >= 500:
+            raise LLMClientError(f"{self.endpoint.provider} {resp.status_code}: {resp.text[:300]}")
+        data = resp.json()
 
         choice = (data.get("choices") or [{}])[0]
         msg = choice.get("message", {})

@@ -37,6 +37,15 @@ def test_health_no_auth(client):
     assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
+def test_models_endpoint(client):
+    c, token = client
+    assert c.get("/api/models").status_code == 401
+    r = c.get("/api/models", headers={"X-Vajra-Token": token})
+    assert r.status_code == 200
+    body = r.json()
+    assert "primary" in body["models"] and body["primary"]["circuit"] == "closed"
+
+
 def test_ping_requires_token(client):
     c, token = client
     assert c.get("/api/ping").status_code == 401

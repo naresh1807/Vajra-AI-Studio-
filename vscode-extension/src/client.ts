@@ -66,6 +66,12 @@ export class VajraClient {
 
   health = () => this.j<Health>("/api/health", { headers: {} });
   ping = () => this.j<{ detail: string }>("/api/ping");
+  models = () =>
+    this.j<{
+      models: Record<string, string>;
+      primary: { requests: number; failures: number; avg_latency_ms: number; circuit: string };
+      fallback: { requests: number; failures: number; circuit: string };
+    }>("/api/models");
 
   openProject = (rootPath: string) =>
     this.j<{ id: string }>("/api/projects", {

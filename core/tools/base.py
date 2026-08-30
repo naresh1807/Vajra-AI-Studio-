@@ -20,6 +20,9 @@ class ToolContext(BaseModel):
     workspace_root: str
     goal_id: str | None = None
     task_id: str | None = None
+    #: sha256 of each file the agent has read this run - used to detect a file
+    #: that changed on disk (user edit) before the agent writes it (P9).
+    file_shas: dict[str, str] = Field(default_factory=dict)
 
     @property
     def root(self) -> Path:

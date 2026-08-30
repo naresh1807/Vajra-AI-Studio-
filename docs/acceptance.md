@@ -35,7 +35,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P20 | Secret protection | 🟢 | `events.redact()` (logs/DB) + `core/security/redaction.py` `redact_secrets()` masks .env / key files / inline creds / PEM blocks / vendor key shapes at every model-facing chokepoint: `read_file` & `search_text` & `semantic_search` tools, agent `build_context`, ChatAgent auto-retrieval, `/api/assist` (refuses edits on secret files). `test_redaction.py`; `secret_scan`; `test_security.py` |
 | P21 | Terminal security (human vs AI) | 🟢 | `/api/terminal/run` = shell; `run_command` tool = argv-only; `test_terminal.py` |
 | P22 | Computer agent | 🟢 | verified live: "create a folder on the Desktop" → approval → created |
-| P23 | High-risk approval | 🟢 | `ApprovalGate`; CRITICAL blocklist; `test_policy.py`, `test_concurrency.py` (expiry) |
+| P23 | High-risk approval | 🟢 | `ApprovalGate` + CRITICAL blocklist now covers the full P23 list: format/wipe, boot config, shutdown/reboot, firewall + AV disable, git force-push / `reset --hard origin`, drop-database, credential + privilege changes. `test_policy.py` (16, incl. a param sweep); `test_concurrency.py` (expiry) |
 | P24-25 | Android companion + pairing | 🟡 | `GET /mobile` page + native APK both do PIN pairing (`/api/pairing/redeem`) or raw token; desktop `Vajra: Pair a Phone` shows the PIN + LAN URL. `test_pairing.py::test_pairing_pin_flow_over_http` + Flutter widget tests. **Not run on a physical device** |
 | P26 | OS development mode | 🟢 | verified live: built + booted `examples/tiny-kernel` in QEMU, read `VAJRA-KERNEL-OK` off serial |
 | P27 | Security engineering mode | 🟢 | scope-gated; verified live: self-audit of this repo |

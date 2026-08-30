@@ -44,18 +44,22 @@ class ToolAction(BaseModel):
 
 
 # Substrings that force CRITICAL regardless of the tool's declared risk.
+# These are blocked outright (manual handling) - the master prompt's P23 list.
 _CRITICAL_MARKERS = (
-    "format ",
-    "mkfs",
-    "diskpart",
-    "rm -rf /",
-    "rmdir /s c:\\",
-    "del /f /s /q c:\\",
-    "shutdown",
-    "bcdedit",
-    "netsh advfirewall set",
-    "disable-windowsdefender",
-    "set-mppreference -disablerealtimemonitoring",
+    # format / wipe drives
+    "format ", "mkfs", "diskpart", "rm -rf /", "rmdir /s c:\\", "del /f /s /q c:\\",
+    # boot config / shutdown during work
+    "shutdown", "bcdedit", "reboot ",
+    # firewall / security software
+    "netsh advfirewall set", "disable-windowsdefender",
+    "set-mppreference -disablerealtimemonitoring", "ufw disable", "systemctl stop firewalld",
+    # force-push git history
+    "push --force", "push -f ", "push --f ", "push origin +", "reset --hard origin",
+    # drop a database
+    "drop database", "dropdb ", "drop schema",
+    # credential / privilege changes
+    "net user ", "net localgroup administ", "usermod -ag", "chpasswd", "set-localuser",
+    "icacls c:\\ ", "takeown /f c:\\",
 )
 
 

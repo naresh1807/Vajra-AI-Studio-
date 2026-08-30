@@ -1,3 +1,5 @@
+import pytest
+
 from core.policy.engine import PolicyEngine, RiskLevel, ToolAction
 
 
@@ -19,6 +21,35 @@ def test_critical_pattern_blocked():
         ToolAction(tool_name="run_command", arguments={"command": "format C:"}, risk_level=RiskLevel.MEDIUM)
     )
     assert not d.allowed and d.risk == RiskLevel.CRITICAL
+
+
+@pytest.mark.parametrize(
+    "cmd",
+    [
+        "git push --force origin main",
+        "git push -f origin main",
+        "psql -c 'DROP DATABASE prod'",
+        "dropdb production",
+        "net user administrator NewPass123",
+        "net localgroup administrators evil /add",
+        "ufw disable",
+        "reboot now",
+        "git reset --hard origin/main",
+    ],
+)
+def test_p23_destructive_commands_blocked(cmd):
+    d = PolicyEngine().validate(
+        ToolAction(tool_name="run_command", arguments={"command": cmd}, risk_level=RiskLevel.MEDIUM)
+    )
+    assert not d.allowed and d.requires_approval and d.risk == RiskLevel.CRITICAL
+
+
+def test_ordinary_git_push_is_not_blocked():
+    d = PolicyEngine().validate(
+        ToolAction(tool_name="run_command", arguments={"command": "git push origin main"},
+                   risk_level=RiskLevel.MEDIUM)
+    )
+    assert d.risk != RiskLevel.CRITICAL
 
 
 def test_medium_write_outside_workspace_escalates(tmp_path):

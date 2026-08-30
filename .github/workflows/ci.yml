@@ -21,7 +21,14 @@ jobs:
       - name: Test
         # conftest.py sets a deterministic VAJRA_PAIRING_TOKEN ("test-token");
         # the API test fixtures hard-code the same value, so don't override it here.
-        run: pytest -q
+        shell: bash
+        run: |
+          set -o pipefail
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pytest -q -rA --tb=short 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          rc=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
   extension:
     name: VS Code extension (tsc + build + package)
@@ -30,7 +37,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - working-directory: vscode-extension
         run: |
           npm install
@@ -49,16 +56,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - working-directory: extensions/language-servers
+      - name: Install language-server packs
+        working-directory: extensions/language-servers
         run: npm install
-      - working-directory: .
+      - name: Install Python package
+        run: pip install -e ".[dev]"
+      - name: LSP tests
+        shell: bash
         run: |
-          pip install -e ".[dev]"
-          pytest -q tests/test_lsp.py
+          set -o pipefail
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          pytest -q -rA --tb=short tests/test_lsp.py 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          rc=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
   mobile:
     name: Flutter (analyze + test)

@@ -1,6 +1,5 @@
 // Smoke test: the app builds and shows the pairing screen when unpaired,
 // with both pairing modes (PIN / Token) offered.
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vajra_companion/main.dart';
 

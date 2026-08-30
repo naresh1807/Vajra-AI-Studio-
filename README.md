@@ -97,4 +97,6 @@ llama.cpp). Swapping providers needs no agent-code changes.
 | Windows installer | 🟢 | `studio\build.ps1 -Setup` → `VajraAIStudioSetup-x64.exe` (Inno) |
 | CI (GitHub Actions) | 🟡 | `.github/workflows/ci.yml` — ruff/pytest, ext build, secret scan, Flutter |
 
+Detailed, honest per-priority status: **[docs/acceptance.md](docs/acceptance.md)**.
+
 See `docs/`, `studio/README.md`, and *Vajra AI Studio Complete Developer Manual v3.0*.

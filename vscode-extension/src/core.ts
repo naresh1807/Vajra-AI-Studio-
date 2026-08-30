@@ -107,6 +107,7 @@ export class CoreManager {
       if (await this.isUp()) {
         this.out.appendLine("[Vajra Core is up]");
         this._onState.fire("up");
+        void this.checkCrashRecovery();
         return true;
       }
     }
@@ -138,6 +139,33 @@ export class CoreManager {
 
   show(): void {
     this.out.show();
+  }
+
+  /** P30: on connect, surface any task that didn't finish last session. */
+  private async checkCrashRecovery(): Promise<void> {
+    const { interrupted } = await this.client.interrupted();
+    if (!interrupted.length) return;
+    const t = interrupted[0];
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const pick = await vscode.window.showWarningMessage(
+      `A Vajra task did not finish last session: "${t.goal}" (${t.changed_files.length} files changed).`,
+      "Review changes",
+      "Roll back",
+      "Dismiss",
+    );
+    if (pick === "Review changes") {
+      void vscode.commands.executeCommand("workbench.view.scm");
+    } else if (pick === "Roll back" && root) {
+      const cps = await this.client.gitCheckpoints(root).catch(() => [] as Array<{ ref: string; label: string }>);
+      const c = await vscode.window.showQuickPick(
+        cps.map((x) => ({ label: x.label || x.ref, ref: x.ref })),
+        { placeHolder: "Restore the project to which checkpoint?" },
+      );
+      if (c) {
+        await this.client.gitRollback(root, c.ref);
+        void vscode.window.showInformationMessage(`Rolled back to ${c.label || c.ref}`);
+      }
+    }
   }
 
   private failHint(): void {

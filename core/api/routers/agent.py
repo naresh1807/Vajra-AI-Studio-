@@ -87,3 +87,16 @@ async def agent_run_diff(run_id: str) -> dict:
 async def agent_stop(req: AgentStopRequest) -> SimpleOk:
     ok = orchestrator.cancel(req.run_id)
     return SimpleOk(ok=ok, detail="stop requested" if ok else "run not active")
+
+
+@router.get("/api/agent/interrupted", dependencies=AUTH)
+async def agent_interrupted() -> dict:
+    """Runs that were mid-flight when the Core last stopped (P30 crash recovery).
+    The client offers: review changes / rollback to the checkpoint / discard."""
+    out = []
+    for g in await db.interrupted_goals():
+        out.append({
+            "id": g["id"], "goal": g["text"], "updated_at": g["updated_at"],
+            "changed_files": await db.diff_for_goal(g["id"]),
+        })
+    return {"interrupted": out}

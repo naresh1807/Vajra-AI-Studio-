@@ -82,12 +82,29 @@ def test_files_read_write_roundtrip(client, tmp_workspace):
 
 def test_files_write_rejects_escape(client, tmp_workspace):
     c, token = client
+    for bad in ("../evil.txt", "a.txt:stream", "/etc/hosts"):
+        r = c.post(
+            "/api/files/write",
+            json={"root": str(tmp_workspace), "path": bad, "content": "x"},
+            headers={"X-Vajra-Token": token},
+        )
+        assert r.status_code == 400
+
+
+def test_files_write_conflict_409(client, tmp_workspace):
+    c, token = client
+    h = {"X-Vajra-Token": token}
+    c.post("/api/files/write", json={"root": str(tmp_workspace), "path": "n.txt", "content": "v1"}, headers=h)
+    fc = c.post("/api/files/read", json={"root": str(tmp_workspace), "path": "n.txt"}, headers=h).json()
+    # something changes the file after the read
+    c.post("/api/files/write", json={"root": str(tmp_workspace), "path": "n.txt", "content": "user-edit"}, headers=h)
     r = c.post(
         "/api/files/write",
-        json={"root": str(tmp_workspace), "path": "../evil.txt", "content": "x"},
-        headers={"X-Vajra-Token": token},
+        json={"root": str(tmp_workspace), "path": "n.txt", "content": "agent-edit", "base_sha": fc["sha256"]},
+        headers=h,
     )
-    assert r.status_code == 400
+    assert r.status_code == 409
+    assert r.json()["detail"]["current"] == "user-edit"
 
 
 def test_terminal_run(client, tmp_workspace):

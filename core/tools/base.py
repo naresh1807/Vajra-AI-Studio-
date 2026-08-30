@@ -25,10 +25,16 @@ class ToolContext(BaseModel):
     def root(self) -> Path:
         return Path(self.workspace_root).resolve()
 
-    def resolve(self, relative: str) -> Path:
-        p = Path(relative)
-        full = (self.root / p).resolve() if not p.is_absolute() else p.resolve()
-        return full
+    def resolve(self, relative: str, *, allow_outside: bool = False) -> Path:
+        """Resolve a path. By default it must stay inside the workspace root
+        (raises PathEscape otherwise); `system` tools that legitimately act on
+        the wider machine pass allow_outside=True."""
+        if allow_outside or not self.workspace_root:
+            p = Path(relative)
+            return (self.root / p).resolve() if not p.is_absolute() else p.resolve()
+        from core.workspace.safepath import safe_resolve
+
+        return safe_resolve(self.workspace_root, relative)
 
 
 class ToolCall(BaseModel):

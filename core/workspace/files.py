@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import difflib
 import fnmatch
+import hashlib
 import os
 import re
 import time
 from pathlib import Path
 
 from pydantic import BaseModel
+
+from core.workspace.safepath import PathEscape, safe_resolve
 
 _IGNORE_DIRS = {
     ".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build",
@@ -41,6 +44,7 @@ class FileContent(BaseModel):
     bytes: int
     encoding: str = "utf-8"
     truncated: bool = False
+    sha256: str = ""  # of `content`; pass back as base_sha to a later write
 
 
 class WriteResult(BaseModel):
@@ -56,12 +60,24 @@ class WorkspaceError(Exception):
     pass
 
 
+class WorkspaceConflict(WorkspaceError):
+    """The file changed on disk since the caller last read it (P9)."""
+
+    def __init__(self, path: str, current: str) -> None:
+        super().__init__(f"{path} changed on disk since it was read")
+        self.path = path
+        self.current = current
+
+
+def sha(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()
+
+
 def _resolve(root: str | Path, rel: str) -> Path:
-    base = Path(root).resolve()
-    target = (base / rel).resolve() if not Path(rel).is_absolute() else Path(rel).resolve()
-    if base != target and base not in target.parents:
-        raise WorkspaceError(f"path escapes workspace: {rel}")
-    return target
+    try:
+        return safe_resolve(root, rel)
+    except PathEscape as exc:
+        raise WorkspaceError(str(exc)) from exc
 
 
 def build_tree(root: str | Path, max_depth: int = 6) -> FileNode:
@@ -161,13 +177,18 @@ def read_file(root: str | Path, rel: str) -> FileContent:
     raw = target.read_bytes()
     truncated = len(raw) > _MAX_READ_BYTES
     text = raw[:_MAX_READ_BYTES].decode("utf-8", errors="replace")
-    return FileContent(path=rel, content=text, bytes=len(raw), truncated=truncated)
+    return FileContent(
+        path=rel, content=text, bytes=len(raw), truncated=truncated, sha256=sha(text)
+    )
 
 
-def write_file(root: str | Path, rel: str, content: str) -> WriteResult:
+def write_file(root: str | Path, rel: str, content: str, base_sha: str | None = None) -> WriteResult:
     target = _resolve(root, rel)
     existed = target.is_file()
     previous = target.read_text(encoding="utf-8", errors="replace") if existed else None
+    # P9: don't clobber a change made since the caller read the file
+    if base_sha and existed and sha(previous or "") != base_sha:
+        raise WorkspaceConflict(rel, previous or "")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8", newline="")
     diff = "".join(

@@ -14,7 +14,14 @@ from core.api.schemas import (
     SearchRequest,
     TreeRequest,
 )
-from core.workspace import WorkspaceError, build_tree, read_file, search_workspace, write_file
+from core.workspace import (
+    WorkspaceConflict,
+    WorkspaceError,
+    build_tree,
+    read_file,
+    search_workspace,
+    write_file,
+)
 
 router = APIRouter()
 
@@ -58,7 +65,10 @@ async def files_read(req: FileReadRequest) -> dict:
 @router.post("/api/files/write", dependencies=AUTH)
 async def files_write(req: FileWriteRequest) -> dict:
     try:
-        result = write_file(req.root, req.path, req.content)
+        result = write_file(req.root, req.path, req.content, base_sha=req.base_sha)
+    except WorkspaceConflict as exc:
+        # 409: the file moved under the caller - hand back the current content
+        raise HTTPException(409, detail={"conflict": True, "path": exc.path, "current": exc.current}) from exc
     except WorkspaceError as exc:
         raise HTTPException(400, str(exc)) from exc
     await events.record(

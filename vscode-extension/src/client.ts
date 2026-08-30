@@ -87,6 +87,16 @@ export class VajraClient {
   runStatus = (id: string) => this.j<RunStatus>(`/api/agent/runs/${id}`);
   stopRun = (id: string) =>
     this.j<unknown>("/api/agent/stop", { method: "POST", body: JSON.stringify({ run_id: id }) });
+  interrupted = () =>
+    this.j<{ interrupted: Array<{ id: string; goal: string; changed_files: string[] }> }>(
+      "/api/agent/interrupted",
+    ).catch(() => ({ interrupted: [] }));
+
+  gitRollback = (root: string, target: string) =>
+    this.j<unknown>("/api/git/rollback", {
+      method: "POST",
+      body: JSON.stringify({ root, target }),
+    });
 
   approvals = () => this.j<Approval[]>("/api/approvals").catch(() => [] as Approval[]);
   resolveApproval = (id: string, verdict: "approved" | "rejected") =>
@@ -138,6 +148,10 @@ export class VajraClient {
     );
   gitCheckpoint = (root: string, label: string) =>
     this.j<unknown>("/api/git/checkpoint", { method: "POST", body: JSON.stringify({ root, label }) });
+  gitCheckpoints = (root: string) =>
+    this.j<Array<{ ref: string; label: string; created_at?: number }>>(
+      `/api/git/checkpoints?root=${encodeURIComponent(root)}`,
+    );
 
   computerRun = (instruction: string) =>
     this.j<{ id: string }>("/api/computer/run", { method: "POST", body: JSON.stringify({ instruction }) });

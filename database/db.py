@@ -83,6 +83,21 @@ class Database:
         rows = await self._query("SELECT * FROM goals WHERE id = ?", (goal_id,))
         return rows[0] if rows else None
 
+    async def mark_interrupted_goals(self) -> list[dict]:
+        """A goal left 'running' when the Core last stopped = a crashed task (P30)."""
+        stale = await self._query("SELECT * FROM goals WHERE status = 'running'")
+        for g in stale:
+            await self._write(
+                "UPDATE goals SET status = 'interrupted', updated_at = ? WHERE id = ?",
+                (time.time(), g["id"]),
+            )
+        return stale
+
+    async def interrupted_goals(self) -> list[dict]:
+        return await self._query(
+            "SELECT * FROM goals WHERE status = 'interrupted' ORDER BY updated_at DESC LIMIT 20"
+        )
+
     # -- audit --------------------------------------------------------
     async def record_event(self, event: dict) -> None:
         await self._write(

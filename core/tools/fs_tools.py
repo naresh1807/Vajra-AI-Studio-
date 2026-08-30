@@ -12,10 +12,12 @@ _MAX_READ_BYTES = 400_000
 
 
 def _guard(ctx: ToolContext, relative: str):
-    target = ctx.resolve(relative)
-    if ctx.root not in target.parents and target != ctx.root:
-        raise PermissionError(f"path escapes workspace: {relative}")
-    return target
+    from core.workspace.safepath import PathEscape
+
+    try:
+        return ctx.resolve(relative)  # strict: raises PathEscape on any escape
+    except PathEscape as exc:
+        raise PermissionError(str(exc)) from exc
 
 
 class ReadFileTool(Tool):

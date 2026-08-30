@@ -47,6 +47,9 @@ _LOCAL_ORIGINS = [
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.persist_task = asyncio.create_task(deps.persist_events())
+    stale = await db.mark_interrupted_goals()  # P30: a crashed run
+    if stale:
+        log.warning("%d unfinished task(s) from the last session - GET /api/agent/interrupted", len(stale))
     log.info("Vajra Core up. models=%s  device=%s", router.describe(), identity().device_id)
     try:
         yield

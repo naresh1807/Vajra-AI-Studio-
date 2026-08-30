@@ -40,6 +40,7 @@ class FileWriteRequest(BaseModel):
     root: str
     path: str
     content: str
+    base_sha: str | None = None  # sha256 of the content the client last read (P9)
 
 
 class EditorOpenRequest(BaseModel):

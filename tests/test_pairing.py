@@ -114,3 +114,17 @@ def test_pairing_pin_flow_over_http(client):
 def test_cors_not_wildcard(client):
     r = client.get("/api/health", headers={"Origin": "https://evil.example"})
     assert r.headers.get("access-control-allow-origin") not in ("*", "https://evil.example")
+
+
+def test_lan_bind_gate(ident):
+    """LAN-bind is allowed when the token is unset (the device secret guards it)
+    and only refused when a weak token is explicitly configured - mirrors run()."""
+
+    def would_refuse(configured: str) -> bool:
+        configured = (configured or "").strip()
+        return bool(configured) and not ident.all_tokens_are_secure(configured)
+
+    assert would_refuse("") is False          # unset -> device secret, fine
+    assert would_refuse("change-me-local-only") is True
+    assert would_refuse("changeme") is True
+    assert would_refuse("a-strong-random-secret-value-here") is False

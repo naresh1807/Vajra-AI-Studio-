@@ -100,12 +100,16 @@ def run() -> None:
     ident = identity()
     host = settings.bind_host
     if host == "0.0.0.0":  # noqa: S104
-        if not ident.all_tokens_are_secure(settings.vajra_pairing_token):
+        configured = (settings.vajra_pairing_token or "").strip()
+        # An unset token is fine - the auto-generated device secret is the guard.
+        # Only refuse when a token IS set and it's a weak/known one.
+        if configured and not ident.all_tokens_are_secure(configured):
             raise SystemExit(
                 "Refusing to LAN-bind with an insecure VAJRA_PAIRING_TOKEN. Unset it to use the "
                 f"auto-generated device secret, or set a strong one.\nsecret: {ident.device_secret}"
             )
         log.warning("Vajra Core is LAN-bound (0.0.0.0). Only do this on a trusted network.")
+        log.info("pair a phone with PIN: GET /api/pairing/pin  |  or device secret: %s", ident.device_secret)
     log.info("device %s  |  pair a phone: GET /api/pairing/pin", ident.device_id)
     uvicorn.run("core.api.main:app", host=host, port=settings.vajra_port, reload=False)
 

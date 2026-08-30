@@ -42,7 +42,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P28 | Observability | 🟢 | every plan/tool/patch/test emits a structured event; DB + `logs/*.jsonl` |
 | P29 | Task cancellation | 🟢 | `orchestrator.cancel()`; `/api/agent/stop`; `test_model_router.py::test_cancellation_propagates` |
 | P30 | Crash recovery | 🟢 | `db.mark_interrupted_goals()` on startup; `/api/agent/interrupted`; `test_crash_recovery.py` |
-| P31 | CI/CD | 🟡 | `.github/workflows/ci.yml` — will run on first PR |
+| P31 | CI/CD | 🟡 | `.github/workflows/ci.yml` runs on push to `main` — core (ruff+pytest, Win/py3.12), extension, language-servers, security, Flutter. First runs surfaced 2 env bugs (token mismatch, missing setup-python), both fixed in 3f2d590; awaiting a green run |
 | P32 | Security edge-case tests | 🟢 | path escapes, approval expiry, concurrency, circuit breaker; huge-file truncation + binary-file flag (`test_files_edge.py`); provider-outage fallback (`test_model_router.py`) |
 | P33 | Windows installer | 🟢 | `studio\build.ps1 -Setup` → `VajraAIStudioSetup-x64.exe` (built, 260 MB) |
 | P34 | Android APK | 🟢 | `scripts\build-apk.ps1` → `VajraMobile.apk` (built, 48 MB) |

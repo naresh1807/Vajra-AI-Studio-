@@ -9,6 +9,8 @@ jobs:
   core:
     name: Core (ruff + pytest)
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,14 +23,26 @@ jobs:
       - name: Test
         # conftest.py sets a deterministic VAJRA_PAIRING_TOKEN ("test-token");
         # the API test fixtures hard-code the same value, so don't override it here.
+        id: pytest
         shell: bash
         run: |
           set -o pipefail
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          pytest -q -rA --tb=short 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-          rc=$?
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
+          pytest -q -rA --tb=short 2>&1 | tee pytest-core.txt
+      - name: Publish pytest output for debugging
+        if: always()
+        shell: bash
+        run: |
+          git config user.email ci@vajra
+          git config user.name vajra-ci
+          git fetch origin
+          git checkout --orphan ci-debug-core
+          git reset
+          mkdir -p _ci
+          cp "$GITHUB_WORKSPACE/pytest-core.txt" _ci/pytest-core.txt || echo "no output file" > _ci/pytest-core.txt
+          echo "run $GITHUB_RUN_ID / sha $GITHUB_SHA / $(date -u)" > _ci/meta.txt
+          git add -f _ci
+          git commit -m "ci-debug core $GITHUB_SHA" || echo nothing
+          git push -f origin ci-debug-core
 
   extension:
     name: VS Code extension (tsc + build + package)
@@ -52,6 +66,8 @@ jobs:
   language-servers:
     name: extensions/language-servers install
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,11 +85,21 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          pytest -q -rA --tb=short tests/test_lsp.py 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-          rc=$?
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
+          pytest -q -rA --tb=short tests/test_lsp.py 2>&1 | tee pytest-lsp.txt
+      - name: Publish LSP pytest output for debugging
+        if: always()
+        shell: bash
+        run: |
+          git config user.email ci@vajra
+          git config user.name vajra-ci
+          git fetch origin
+          git checkout --orphan ci-debug-lsp
+          git reset
+          mkdir -p _ci
+          cp "$GITHUB_WORKSPACE/pytest-lsp.txt" _ci/pytest-lsp.txt || echo "no output file" > _ci/pytest-lsp.txt
+          git add -f _ci
+          git commit -m "ci-debug lsp $GITHUB_SHA" || echo nothing
+          git push -f origin ci-debug-lsp
 
   mobile:
     name: Flutter (analyze + test)

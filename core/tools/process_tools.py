@@ -5,7 +5,9 @@ commands are passed as argument arrays.
 from __future__ import annotations
 
 import asyncio
+import os
 import shlex
+import subprocess
 from typing import Any
 
 from core.policy.engine import RiskLevel
@@ -18,6 +20,23 @@ def _as_argv(command: Any) -> list[str]:
     if isinstance(command, list):
         return [str(c) for c in command]
     return shlex.split(str(command), posix=False)
+
+
+def _resolve(argv: list[str]) -> tuple[list[str], bool]:
+    """Resolve argv[0] against PATH + the toolchain dirs. Returns (argv, use_shell).
+
+    On Windows a resolved ``.bat``/``.cmd`` (flutter, npm, gradlew…) can't be run
+    by create_subprocess_exec, so route it through the shell via list2cmdline —
+    still an argument array, never a model-supplied shell string.
+    """
+    if not argv:
+        return argv, False
+    from core.lsp.config import _which
+
+    resolved = _which(argv[0]) or argv[0]
+    argv = [resolved, *argv[1:]]
+    use_shell = os.name == "nt" and resolved.lower().endswith((".bat", ".cmd"))
+    return argv, use_shell
 
 
 class RunCommandTool(Tool):
@@ -47,14 +66,19 @@ class RunCommandTool(Tool):
     ) -> ToolResult:
         if not command:
             return ToolResult.fail("no command given")
-        argv = _as_argv(command)
+        argv, use_shell = _resolve(_as_argv(command))
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *argv,
+            common = dict(
                 cwd=str(ctx.root),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            if use_shell:  # a Windows .bat/.cmd wrapper (flutter, npm, gradlew, …)
+                proc = await asyncio.create_subprocess_shell(
+                    subprocess.list2cmdline(argv), **common
+                )
+            else:
+                proc = await asyncio.create_subprocess_exec(*argv, **common)
         except (FileNotFoundError, OSError) as exc:
             return ToolResult.fail(f"cannot start process: {exc}")
         try:

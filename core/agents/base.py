@@ -22,10 +22,13 @@ class AgentContext(BaseModel):
     retrieved: str = ""        # RAG: code most relevant to the goal (P18)
     working_diff: str = ""     # uncommitted changes (what "fix X" is about)
     focus: str = ""            # the client's currently-open file / selection
+    playbook: str = ""         # stack-specific build recipe when the goal implies one
     scratch: dict = {}
 
     def prompt_context(self) -> str:
         parts = []
+        if self.playbook:
+            parts.append(self.playbook)
         if self.workspace_summary:
             parts.append(f"# Project\n{self.workspace_summary}")
         if self.focus:

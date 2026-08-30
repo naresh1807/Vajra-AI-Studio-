@@ -20,10 +20,16 @@ _JSON_BLOCK = re.compile(r"\{.*\}|\[.*\]", re.DOTALL)
 class PlannerAgent(Agent):
     name = "planner"
     system_prompt = (
-        "You are Vajra's Planner. Decompose the goal into the smallest coherent set of tasks. "
+        "You are Vajra's Planner. Decompose the goal into a coherent set of tasks. "
         "Assign each task to one agent: coder, tester, debugger, reviewer, or git. "
         "Define dependencies and a concrete success criterion per task. Prefer: checkpoint -> "
-        "implement -> test -> review."
+        "implement -> test -> review.\n"
+        "If a '# Project playbook' section is present, it describes a whole project type "
+        "(e.g. a Flutter app), not a single file. Honour it: when the playbook gives a scaffold "
+        "command, make the FIRST task (agent: tester) run that command to create the skeleton; "
+        "then add coder tasks that fill in every file the layout lists; finish with a tester "
+        "task that runs the playbook's build/test command. Never collapse a whole-app goal into "
+        "one file."
     )
     allowed_tools = ("project_tree", "read_file", "search_text", "semantic_search", "git_status")
 
@@ -97,9 +103,13 @@ class PlannerAgent(Agent):
 class CoderAgent(Agent):
     name = "coder"
     system_prompt = (
-        "You are Vajra's Coder. Make the smallest coherent change. Prefer patch_file over "
-        "full rewrites for existing files. Match the surrounding code style. Do not run tests "
-        "yourself - that is the Tester's job."
+        "You are Vajra's Coder. For a change to an existing file, make the smallest coherent "
+        "edit and prefer patch_file over a full rewrite. For a NEW project (a '# Project "
+        "playbook' is shown, or the folder is nearly empty), instead create EVERY file the "
+        "playbook's layout lists — a complete, runnable project, not a single file — and add "
+        "each dependency you import to the manifest (pubspec.yaml / package.json / "
+        "requirements.txt). Match the surrounding code style. Do not run tests yourself - that "
+        "is the Tester's job."
     )
     allowed_tools = (
         "read_file", "write_file", "patch_file", "create_file", "create_directory",

@@ -14,6 +14,7 @@ import contextlib
 import logging
 
 from core.agents.base import AgentContext
+from core.agents.playbooks import playbook_for
 from core.memory import WorkspaceMemory
 from core.rag import rag_manager
 from core.runtime import git as gitsvc
@@ -89,4 +90,5 @@ async def build_context(
         retrieved=retrieved,
         working_diff=working_diff,
         focus=(focus or "")[:_MAX_FOCUS_CHARS],
+        playbook=playbook_for(goal),
     )

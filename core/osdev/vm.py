@@ -118,11 +118,13 @@ def _build_argv(spec: VmSpec, qemu: str) -> list[str]:
 
 
 async def boot_and_capture(spec: VmSpec) -> BootResult:
+    # Validate the request before probing the environment, so a caller error is
+    # reported the same way whether or not QEMU happens to be installed.
+    if not (spec.kernel or spec.disk or spec.iso):
+        return BootResult(booted=False, error="nothing to boot: set kernel, disk or iso")
     qemu = qemu_binary(spec.arch)
     if not qemu:
         return BootResult(booted=False, error=f"qemu-system-{spec.arch} not found on PATH")
-    if not (spec.kernel or spec.disk or spec.iso):
-        return BootResult(booted=False, error="nothing to boot: set kernel, disk or iso")
     for label, p in (
         ("kernel", spec.kernel), ("initrd", spec.initrd),
         ("disk", spec.disk), ("iso", spec.iso),

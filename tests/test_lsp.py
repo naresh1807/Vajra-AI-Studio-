@@ -30,7 +30,7 @@ async def test_clangd_diagnostics(tmp_path):
     try:
         client = await mgr.sync(str(tmp_path), str(src), src.read_text(), "c")
         assert client is not None
-        for _ in range(30):
+        for _ in range(75):  # cold clangd on a shared CI runner can be slow
             await asyncio.sleep(0.4)
             if client.diagnostics(str(src)):
                 break
@@ -60,8 +60,8 @@ async def test_json_diagnostics(tmp_path):
     try:
         client = await mgr.sync(str(tmp_path), str(bad), bad.read_text(), "json")
         assert client is not None
-        for _ in range(20):
-            await asyncio.sleep(0.3)
+        for _ in range(60):
+            await asyncio.sleep(0.4)
             if client.diagnostics(str(bad)):
                 break
         assert client.diagnostics(str(bad)), "expected a trailing-comma diagnostic"
@@ -76,7 +76,7 @@ async def test_python_diagnostics(tmp_path):
     try:
         client = await mgr.sync(str(tmp_path), str(bad), bad.read_text(), "python")
         assert client is not None
-        for _ in range(20):
+        for _ in range(75):  # pyright cold-start + first analysis is slow on CI
             await asyncio.sleep(0.4)
             if client.diagnostics(str(bad)):
                 break

@@ -1,7 +1,7 @@
 name: vajra_companion
-description: "Vajra Mobile - secure remote control client for the desktop Vajra Core."
+description: "Vajra Mobile - control your desktop Vajra Core, or work on a GitHub repo standalone."
 publish_to: "none"
-version: 0.2.0+1
+version: 0.3.0+3
 
 environment:
   sdk: ^3.13.2
@@ -12,6 +12,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.0
   shared_preferences: ^2.2.0
+  flutter_secure_storage: ^9.2.2
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

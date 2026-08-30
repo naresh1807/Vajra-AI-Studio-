@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
+import 'github/gh_ui.dart';
 
 void main() => runApp(const VajraApp());
 
@@ -51,16 +53,32 @@ class _HomeState extends State<Home> {
   List<dynamic> approvals = [];
   Timer? _poll;
 
+  String? mode; // null = chooser, 'pc', 'github'
+
   @override
   void initState() {
     super.initState();
+    SharedPreferences.getInstance().then((p) {
+      setState(() => mode = p.getString('vajra.mode'));
+    });
     api.load().then((_) async {
       urlC.text = api.baseUrl;
       // Already have a token from a previous login? verify it, skip the password.
       if (api.baseUrl.isNotEmpty && api.token.isNotEmpty && await api.ping()) {
+        setState(() => mode = 'pc');
         await _enter();
       }
     });
+  }
+
+  Future<void> _setMode(String? m) async {
+    final p = await SharedPreferences.getInstance();
+    if (m == null) {
+      await p.remove('vajra.mode');
+    } else {
+      await p.setString('vajra.mode', m);
+    }
+    if (mounted) setState(() => mode = m);
   }
 
   @override
@@ -143,6 +161,8 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
+    if (mode == 'github') return GhModeApp(onExit: () => _setMode(null));
+    if (mode == null) return _chooserScreen();
     if (!paired) return _pairScreen();
     return Scaffold(
       appBar: AppBar(title: const Text('VAJRA Mobile')),
@@ -162,7 +182,68 @@ class _HomeState extends State<Home> {
     );
   }
 
+  Widget _chooserScreen() => Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Text('VAJRA Mobile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Choose how you want to work.',
+                  style: TextStyle(color: Colors.white60), textAlign: TextAlign.center),
+              const SizedBox(height: 32),
+              _chooserCard(
+                icon: Icons.hub_outlined,
+                title: 'Work on a GitHub repo',
+                body: 'Standalone. No PC needed. Describe a task, get a pull request. '
+                    'Needs a GitHub token + a model API key.',
+                onTap: () => _setMode('github'),
+              ),
+              const SizedBox(height: 16),
+              _chooserCard(
+                icon: Icons.desktop_windows_outlined,
+                title: 'Control my PC',
+                body: 'Run the desktop Vajra Core over your Wi-Fi — full agent, computer & OS tasks. '
+                    'Your phone and PC must be on the same network.',
+                onTap: () => _setMode('pc'),
+              ),
+            ]),
+          ),
+        ),
+      );
+
+  Widget _chooserCard({
+    required IconData icon,
+    required String title,
+    required String body,
+    required VoidCallback onTap,
+  }) =>
+      Card(
+        color: _panel,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(children: [
+              Icon(icon, size: 32, color: _accent),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(body, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
+
   Widget _pairScreen() => Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: () => _setMode(null)),
+          title: const Text('Control my PC'),
+        ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),

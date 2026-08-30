@@ -46,7 +46,9 @@ MOBILE_HTML = """<!doctype html>
   <section id="pair" class="card">
     <h3>Pair with your PC</h3>
     <input id="url" placeholder="http://192.168.1.20:8760" inputmode="url"/>
-    <input id="tok" placeholder="pairing token" style="margin-top:8px"/>
+    <input id="pin" placeholder="6-digit PIN (on the PC: Vajra: Pair a Phone)" inputmode="numeric" maxlength="6" style="margin-top:8px"/>
+    <div class="muted" style="margin-top:6px">…or paste a device token instead of a PIN:</div>
+    <input id="tok" placeholder="device secret / paired token" style="margin-top:4px"/>
     <button onclick="pair()">Connect</button>
     <div id="pairErr" class="muted" style="color:var(--bad);margin-top:6px"></div>
   </section>
@@ -85,15 +87,23 @@ function h(){ return {"X-Vajra-Token":S.tok,"Content-Type":"application/json"}; 
 async function api(path, opts){ const r=await fetch(S.url+path, opts); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 
 async function pair(){
-  S.url=url.value.replace(/\\/+$/,""); S.tok=tok.value.trim(); pairErr.textContent="";
+  S.url=url.value.replace(/\\/+$/,""); pairErr.textContent="";
+  const pinv=(pin.value||"").trim();
   try{
     const hp=await fetch(S.url+"/api/health"); const j=await hp.json();
     ver.textContent=j.version||"";
+    if(pinv){
+      const r=await fetch(S.url+"/api/pairing/redeem",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:pinv,name:"Vajra Mobile (web)"})});
+      if(!r.ok) throw new Error("bad or expired PIN");
+      S.tok=(await r.json()).token;
+    }else{
+      S.tok=tok.value.trim();
+    }
     await api("/api/ping",{headers:h()});
     localStorage.setItem("vajra.mobile",JSON.stringify({url:S.url,tok:S.tok}));
     dot.classList.add("ok"); pair.hidden=true; tabs.hidden=false; tab("New");
     loadProjects(); setInterval(poll, 2000);
-  }catch(e){ pairErr.textContent="Could not connect / bad token."; }
+  }catch(e){ pairErr.textContent="Could not pair — check the URL and PIN/token."; }
 }
 
 async function loadProjects(){

@@ -36,7 +36,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P21 | Terminal security (human vs AI) | 🟢 | `/api/terminal/run` = shell; `run_command` tool = argv-only; `test_terminal.py` |
 | P22 | Computer agent | 🟢 | verified live: "create a folder on the Desktop" → approval → created |
 | P23 | High-risk approval | 🟢 | `ApprovalGate`; CRITICAL blocklist; `test_policy.py`, `test_concurrency.py` (expiry) |
-| P24-25 | Android companion + pairing | 🟡 | `GET /mobile` page 🟢; native APK builds 🟡; QR/PIN pairing endpoint 🟢, app-side 🔵 |
+| P24-25 | Android companion + pairing | 🟡 | `GET /mobile` page + native APK both do PIN pairing (`/api/pairing/redeem`) or raw token; desktop `Vajra: Pair a Phone` shows the PIN + LAN URL. `test_pairing.py::test_pairing_pin_flow_over_http` + Flutter widget tests. **Not run on a physical device** |
 | P26 | OS development mode | 🟢 | verified live: built + booted `examples/tiny-kernel` in QEMU, read `VAJRA-KERNEL-OK` off serial |
 | P27 | Security engineering mode | 🟢 | scope-gated; verified live: self-audit of this repo |
 | P28 | Observability | 🟢 | every plan/tool/patch/test emits a structured event; DB + `logs/*.jsonl` |
@@ -62,8 +62,9 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
    run live against Nemotron on a broken pytest project: tester→debugger→coder→
    tester→reviewer(APPROVED)→git, bounded retries, final gate green.
 3. **Mobile control** (connect → select project → "run tests" → results → approve):
-   🟡 — the `GET /mobile` web page does this today over LAN; the native APK
-   builds but has not been installed on a device.
+   🟡 — the `GET /mobile` web page does the whole flow today over LAN (PIN or
+   token pairing); the native APK builds and its pairing + task/approval code is
+   unit-tested, but it has not been installed on a physical device.
 4. **OS development** (edit → build → boot QEMU → capture output → patch → rebuild):
    🟢 — verified live end-to-end with `examples/tiny-kernel` and the OS-dev agent.
 

@@ -218,3 +218,5 @@ def test_mobile_page_served_unauthenticated(client):
     r = c.get("/mobile")
     assert r.status_code == 200
     assert "VAJRA" in r.text and "/api/computer/run" in r.text and "/api/approvals" in r.text
+    # PIN pairing path is offered (P25) alongside raw-token entry
+    assert "/api/pairing/redeem" in r.text

@@ -41,6 +41,9 @@ class _HomeState extends State<Home> {
   int tab = 0;
   final urlC = TextEditingController();
   final tokC = TextEditingController();
+  final pinC = TextEditingController();
+  bool pinMode = true;
+  bool pairing = false;
   final cmpC = TextEditingController();
   final goalC = TextEditingController();
   List<dynamic> projects = [];
@@ -55,25 +58,44 @@ class _HomeState extends State<Home> {
     api.load().then((_) {
       urlC.text = api.baseUrl;
       tokC.text = api.token;
-      if (api.baseUrl.isNotEmpty && api.token.isNotEmpty) _pair();
+      if (api.baseUrl.isNotEmpty && api.token.isNotEmpty) {
+        pinMode = false;
+        _pair();
+      }
     });
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    urlC.dispose();
+    tokC.dispose();
+    pinC.dispose();
+    cmpC.dispose();
+    goalC.dispose();
     super.dispose();
   }
 
   Future<void> _pair() async {
-    await api.save(urlC.text, tokC.text);
-    if (!await api.ping()) {
-      _snack('Could not connect / bad token');
-      return;
+    setState(() => pairing = true);
+    try {
+      if (pinMode && pinC.text.trim().isNotEmpty) {
+        await api.redeemPin(urlC.text, pinC.text, 'Vajra Mobile');
+      } else {
+        await api.save(urlC.text, tokC.text);
+      }
+      if (!await api.ping()) {
+        _snack(pinMode ? 'Pairing did not stick — check the PIN and URL' : 'Could not connect / bad token');
+        return;
+      }
+      setState(() => paired = true);
+      projects = await api.projects().catchError((_) => []);
+      _poll = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+    } catch (e) {
+      _snack('$e');
+    } finally {
+      if (mounted) setState(() => pairing = false);
     }
-    setState(() => paired = true);
-    projects = await api.projects().catchError((_) => []);
-    _poll = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
   }
 
   Future<void> _tick() async {
@@ -141,11 +163,34 @@ class _HomeState extends State<Home> {
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Text('Pair with your PC', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: true, label: Text('PIN')),
+                  ButtonSegment(value: false, label: Text('Token')),
+                ],
+                selected: {pinMode},
+                onSelectionChanged: (s) => setState(() => pinMode = s.first),
+              ),
+              const SizedBox(height: 16),
               TextField(controller: urlC, decoration: const InputDecoration(hintText: 'http://192.168.1.20:8760')),
               const SizedBox(height: 10),
-              TextField(controller: tokC, decoration: const InputDecoration(hintText: 'pairing token')),
+              if (pinMode)
+                TextField(
+                  controller: pinC,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  decoration: const InputDecoration(
+                    hintText: '6-digit code',
+                    helperText: 'On the PC: Vajra: Pair a Phone',
+                  ),
+                )
+              else
+                TextField(controller: tokC, decoration: const InputDecoration(hintText: 'device secret / paired token')),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _pair, child: const Text('Connect')),
+              FilledButton(
+                onPressed: pairing ? null : _pair,
+                child: Text(pairing ? 'Pairing…' : 'Connect'),
+              ),
             ]),
           ),
         ),

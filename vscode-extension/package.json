@@ -28,6 +28,7 @@
       { "command": "vajra.showCoreLog", "title": "Vajra: Show Core Log" },
       { "command": "vajra.healthCheck", "title": "Vajra: Health Check" },
       { "command": "vajra.firstRun", "title": "Vajra: First-time Setup" },
+      { "command": "vajra.pairPhone", "title": "Vajra: Pair a Phone" },
       { "command": "vajra.run", "title": "Vajra: Run Project", "icon": "$(play)" },
       { "command": "vajra.build", "title": "Vajra: Build Project" },
       { "command": "vajra.test", "title": "Vajra: Run Tests" },

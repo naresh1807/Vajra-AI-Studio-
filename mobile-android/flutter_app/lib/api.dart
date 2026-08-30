@@ -48,6 +48,21 @@ class VajraApi {
   Future<Map<String, dynamic>> health() =>
       http.get(Uri.parse('$baseUrl/api/health')).then((r) => jsonDecode(r.body) as Map<String, dynamic>);
 
+  /// PIN pairing: the desktop shows a 6-digit code (Vajra: Pair a Phone), the
+  /// phone redeems it here — unauthenticated — for its own per-device token,
+  /// which is then persisted. No shared secret is ever typed on the phone.
+  Future<void> redeemPin(String url, String pin, String name) async {
+    final base = url.replaceAll(RegExp(r'/+$'), '');
+    final r = await http.post(
+      Uri.parse('$base/api/pairing/redeem'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'pin': pin.trim(), 'name': name}),
+    );
+    if (r.statusCode >= 400) throw Exception('pairing failed: ${r.statusCode} ${r.body}');
+    final tok = (jsonDecode(r.body) as Map<String, dynamic>)['token'] as String;
+    await save(base, tok);
+  }
+
   Future<bool> ping() async {
     try {
       await _get('/api/ping');

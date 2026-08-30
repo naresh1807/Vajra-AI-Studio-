@@ -117,6 +117,11 @@ export class VajraClient {
       body: JSON.stringify({ root, target }),
     });
 
+  pairingPin = () =>
+    this.j<{ device_id: string; pin: string; expires_in: number; connect: { url: string } }>(
+      "/api/pairing/pin",
+    );
+
   approvals = () => this.j<Approval[]>("/api/approvals").catch(() => [] as Approval[]);
   resolveApproval = (id: string, verdict: "approved" | "rejected") =>
     this.j<unknown>("/api/approvals", {

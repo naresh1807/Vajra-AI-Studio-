@@ -155,5 +155,20 @@ export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, 
     vscode.commands.registerCommand("vajra.run", () => runProject(client, root(), "run")),
     vscode.commands.registerCommand("vajra.build", () => runProject(client, root(), "build")),
     vscode.commands.registerCommand("vajra.test", () => runProject(client, root(), "test")),
+    vscode.commands.registerCommand("vajra.pairPhone", async () => {
+      try {
+        const p = await client.pairingPin();
+        const mins = Math.round((p.expires_in || 300) / 60);
+        const pick = await vscode.window.showInformationMessage(
+          `Pair a phone: open ${p.connect.url}/mobile (or the Vajra Mobile app) on the same Wi-Fi and enter PIN ${p.pin} — valid ${mins} min.`,
+          "Copy PIN",
+          "Copy URL",
+        );
+        if (pick === "Copy PIN") await vscode.env.clipboard.writeText(p.pin);
+        if (pick === "Copy URL") await vscode.env.clipboard.writeText(`${p.connect.url}/mobile`);
+      } catch (e) {
+        void vscode.window.showErrorMessage(`Vajra: could not get a pairing PIN — ${e}`);
+      }
+    }),
   );
 }

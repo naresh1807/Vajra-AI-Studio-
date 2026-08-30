@@ -1,11 +1,9 @@
-import 'dart:convert';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../github/gh_store.dart';
 import '../github/nim.dart';
 import 'local_agent.dart';
+import 'saf.dart';
 
 /// "Files on this device" mode: pick files (internal storage, SD card, Google
 /// Drive, a plugged-in USB drive - anything Android's file picker exposes),
@@ -42,22 +40,17 @@ class _LocalModeAppState extends State<LocalModeApp> {
   }
 
   Future<void> _pick() async {
-    final res = await FilePicker.pickFiles(allowMultiple: true, withData: true);
-    if (res == null) return;
-    setState(() {
-      for (final f in res.files) {
-        if (f.bytes == null) continue;
-        String text;
-        try {
-          text = utf8.decode(f.bytes!);
-        } catch (_) {
-          _err = '${f.name} is not a text file — skipped.';
-          continue;
+    try {
+      final picked = await Saf.openFiles();
+      setState(() {
+        for (final f in picked) {
+          _picked.removeWhere((p) => p.name == f.name);
+          _picked.add(f);
         }
-        _picked.removeWhere((p) => p.name == f.name);
-        _picked.add(LocalFile(f.name, text));
-      }
-    });
+      });
+    } catch (e) {
+      setState(() => _err = '$e'.replaceFirst('Exception: ', ''));
+    }
   }
 
   Future<void> _run() async {
@@ -89,12 +82,15 @@ class _LocalModeAppState extends State<LocalModeApp> {
   }
 
   Future<void> _save(LocalFile f) async {
-    final path = await FilePicker.saveFile(
-      fileName: f.name,
-      bytes: utf8.encode(f.content),
-    );
-    if (path != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved ${f.name}')));
+    try {
+      final saved = await Saf.saveFile(f.name, f.content);
+      if (saved != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved $saved')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+      }
     }
   }
 

@@ -22,8 +22,10 @@ function bad($m)  { Write-Host "  FAIL $m" -ForegroundColor Red; $script:fail++ 
 
 $cli = Join-Path $Tree "bin\vajra-studio.cmd"
 if (Test-Path $cli) {
-  $v = & $cli --version 2>&1 | Select-Object -First 1
-  if ($LASTEXITCODE -eq 0 -and $v -match '^\d+\.\d+\.\d+') { ok "CLI --version -> $v" } else { bad "CLI --version ($v)" }
+  $out = (& $cli --version 2>&1)          # capture fully first - piping to Select-First kills the child
+  $rc = $LASTEXITCODE
+  $v = ($out | Select-Object -First 1)
+  if ($rc -eq 0 -and "$v" -match '^\d+\.\d+\.\d+') { ok "CLI --version -> $v" } else { bad "CLI --version (rc=$rc, '$v')" }
 } else { bad "missing $cli" }
 
 $pj = Join-Path $Tree "resources\app\product.json"

@@ -21,6 +21,13 @@ _PORT_RE = re.compile(r"(?:port|:)\s*(\d{2,5})\b", re.I)
 _MAX_LINES = 800
 
 
+def _list2line(argv: list[str]) -> str:
+    import subprocess
+    import sys
+
+    return subprocess.list2cmdline(argv) if sys.platform == "win32" else shlex.join(argv)
+
+
 def _as_argv(command: list[str] | str) -> list[str]:
     if isinstance(command, list):
         return [str(c) for c in command]
@@ -73,20 +80,29 @@ class ProcessManager:
     def __init__(self) -> None:
         self._procs: dict[str, ManagedProcess] = {}
 
-    async def start(self, command: list[str] | str, cwd: str, label: str | None = None) -> ManagedProcess:
+    async def start(
+        self, command: list[str] | str, cwd: str, label: str | None = None, *, shell: bool | None = None
+    ) -> ManagedProcess:
         argv = _as_argv(command)
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            cwd=cwd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            stdin=asyncio.subprocess.DEVNULL,
-        )
+        # dev servers are usually shell commands (npm/vite/uvicorn --reload/...):
+        # route a bare string through the shell so PATHEXT (.cmd) + && + pipes work.
+        use_shell = isinstance(command, str) if shell is None else shell
+        common = {
+            "cwd": cwd,
+            "stdout": asyncio.subprocess.PIPE,
+            "stderr": asyncio.subprocess.STDOUT,
+            "stdin": asyncio.subprocess.DEVNULL,
+        }
+        if use_shell:
+            line = command if isinstance(command, str) else _list2line(argv)
+            proc = await asyncio.create_subprocess_shell(line, **common)
+        else:
+            proc = await asyncio.create_subprocess_exec(*argv, **common)
         mp = ManagedProcess(
             id=str(uuid.uuid4())[:8],
             argv=argv,
             cwd=cwd,
-            label=label or " ".join(argv)[:60],
+            label=label or (command if isinstance(command, str) else " ".join(argv))[:60],
             proc=proc,
         )
         mp._pump = asyncio.create_task(self._pump(mp))

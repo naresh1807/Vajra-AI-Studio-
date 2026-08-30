@@ -1,7 +1,49 @@
-/** Status bar, semantic search, git checkpoint, project sync. */
+/** Status bar, semantic search, git checkpoint, project sync, run. */
 import * as vscode from "vscode";
 import { VajraClient } from "./client";
 import { CoreManager } from "./core";
+
+async function runProject(client: VajraClient, root: string | undefined, kind: string) {
+  if (!root) {
+    void vscode.window.showWarningMessage("Open a folder first.");
+    return;
+  }
+  let plan;
+  try {
+    plan = await client.runPlan(root, kind);
+  } catch (e) {
+    void vscode.window.showErrorMessage(`Vajra: ${e}`);
+    return;
+  }
+  let command = plan.command;
+  if (!command) {
+    command = (await vscode.window.showInputBox({ prompt: `No ${kind} command detected — enter one` })) ?? "";
+    if (!command) return;
+  } else {
+    const alt = Object.entries(plan.alternatives).map(([k, v]) => ({ label: `${k}: ${v}`, cmd: v }));
+    const pick = await vscode.window.showQuickPick(
+      [{ label: `${kind}: ${command}${plan.framework ? `  (${plan.framework})` : ""}`, cmd: command }, ...alt],
+      { placeHolder: `Vajra: ${kind}` },
+    );
+    if (!pick) return;
+    command = pick.cmd;
+  }
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Vajra: ${kind} — ${command}` },
+    async () => {
+      const r = await client.runStart(root, kind, command);
+      if (r.url) {
+        const open = await vscode.window.showInformationMessage(`Running at ${r.url}`, "Open");
+        if (open === "Open") void vscode.env.openExternal(vscode.Uri.parse(r.url));
+      } else if (r.exit_code !== undefined) {
+        const ch = vscode.window.createOutputChannel("Vajra Run");
+        ch.append(r.stdout ?? "");
+        ch.show();
+        void vscode.window.showInformationMessage(`${kind} exited ${r.exit_code}`);
+      }
+    },
+  );
+}
 
 export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, core: CoreManager) {
   const root = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -110,5 +152,8 @@ export function registerMisc(ctx: vscode.ExtensionContext, client: VajraClient, 
         `Vajra index: ${s.files} files, ${s.chunks} chunks (${s.embedder})`,
       );
     }),
+    vscode.commands.registerCommand("vajra.run", () => runProject(client, root(), "run")),
+    vscode.commands.registerCommand("vajra.build", () => runProject(client, root(), "build")),
+    vscode.commands.registerCommand("vajra.test", () => runProject(client, root(), "test")),
   );
 }

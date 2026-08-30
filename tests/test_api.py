@@ -37,6 +37,14 @@ def test_health_no_auth(client):
     assert r.status_code == 200 and r.json()["status"] == "ok"
 
 
+def test_run_plan_endpoint(client, tmp_workspace):
+    c, token = client
+    r = c.get("/api/run/plan", params={"root": str(tmp_workspace)}, headers={"X-Vajra-Token": token})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "run" and "alternatives" in body
+
+
 def test_models_endpoint(client):
     c, token = client
     assert c.get("/api/models").status_code == 401

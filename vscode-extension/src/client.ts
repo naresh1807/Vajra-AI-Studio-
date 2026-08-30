@@ -165,6 +165,20 @@ export class VajraClient {
     this.j<{ branch: string; files: Array<{ path: string; status: string; staged: boolean }> }>(
       `/api/git/status?root=${encodeURIComponent(root)}`,
     );
+
+  runPlan = (root: string, kind = "run") =>
+    this.j<{
+      command: string;
+      framework: string | null;
+      port: number | null;
+      kind: string;
+      alternatives: Record<string, string>;
+    }>(`/api/run/plan?root=${encodeURIComponent(root)}&kind=${kind}`);
+  runStart = (root: string, kind = "run", command?: string) =>
+    this.j<{ kind: string; command: string; url?: string | null; exit_code?: number; stdout?: string }>(
+      "/api/run/start",
+      { method: "POST", body: JSON.stringify({ root, kind, command }) },
+    );
   gitCheckpoint = (root: string, label: string) =>
     this.j<unknown>("/api/git/checkpoint", { method: "POST", body: JSON.stringify({ root, label }) });
   gitCheckpoints = (root: string) =>

@@ -2,6 +2,7 @@
  *  VS Code's native diff editor so the user reviews before saving. */
 import * as vscode from "vscode";
 import { VajraClient } from "./client";
+import { applyHunks, diffHunks } from "./hunks";
 
 const PROSE = new Set(["explain", "security"]);
 
@@ -82,17 +83,40 @@ async function showDiffAndApply(doc: vscode.TextDocument, proposed: string) {
     preview,
     `${doc.fileName.split(/[\\/]/).pop()} ↔ Vajra proposal`,
   );
+  const hunks = diffHunks(doc.getText(), proposed);
+  const choices = ["Apply & Save", "Discard"];
+  if (hunks.length > 1) choices.splice(1, 0, `Apply hunk-by-hunk… (${hunks.length})`);
   const pick = await vscode.window.showInformationMessage(
     "Apply Vajra's change?",
     { modal: false },
-    "Apply & Save",
-    "Discard",
+    ...choices,
   );
   reg.dispose();
-  if (pick === "Apply & Save") {
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(orig, new vscode.Range(0, 0, doc.lineCount, 0), proposed);
-    await vscode.workspace.applyEdit(edit);
-    await doc.save();
+  if (!pick || pick === "Discard") return;
+
+  const eol = doc.eol === vscode.EndOfLine.CRLF ? "\r\n" : "\n";
+  let finalText = proposed;
+
+  if (pick.startsWith("Apply hunk-by-hunk")) {
+    const items = hunks.map((h, i) => ({
+      label: `Hunk ${i + 1} · line ${h.origStart + 1}`,
+      detail:
+        h.removed.map((l) => `- ${l}`).join("\n").slice(0, 300) +
+        (h.removed.length && h.added.length ? "\n" : "") +
+        h.added.map((l) => `+ ${l}`).join("\n").slice(0, 300),
+      picked: true,
+      index: i,
+    }));
+    const chosen = await vscode.window.showQuickPick(items, {
+      canPickMany: true,
+      title: "Select the hunks to apply",
+    });
+    if (!chosen || chosen.length === 0) return;
+    finalText = applyHunks(doc.getText(), hunks, new Set(chosen.map((c) => c.index)), eol);
   }
+
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(orig, new vscode.Range(0, 0, doc.lineCount, 0), finalText);
+  await vscode.workspace.applyEdit(edit);
+  await doc.save();
 }

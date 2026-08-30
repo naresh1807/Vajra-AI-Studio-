@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'github/gh_ui.dart';
+import 'local/local_ui.dart';
 
 void main() => runApp(const VajraApp());
 
@@ -162,6 +163,7 @@ class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     if (mode == 'github') return GhModeApp(onExit: () => _setMode(null));
+    if (mode == 'local') return LocalModeApp(onExit: () => _setMode(null));
     if (mode == null) return _chooserScreen();
     if (!paired) return _pairScreen();
     return Scaffold(
@@ -184,9 +186,10 @@ class _HomeState extends State<Home> {
 
   Widget _chooserScreen() => Scaffold(
         body: SafeArea(
-          child: Padding(
+          child: ListView(
             padding: const EdgeInsets.all(24),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            children: [
+              const SizedBox(height: 24),
               const Text('VAJRA Mobile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Choose how you want to work.',
@@ -201,13 +204,21 @@ class _HomeState extends State<Home> {
               ),
               const SizedBox(height: 16),
               _chooserCard(
+                icon: Icons.sd_storage_outlined,
+                title: 'Files on this device',
+                body: 'Pick files from phone storage, Google Drive or a plugged-in USB drive, '
+                    'let the AI edit them, then save the results back.',
+                onTap: () => _setMode('local'),
+              ),
+              const SizedBox(height: 16),
+              _chooserCard(
                 icon: Icons.desktop_windows_outlined,
                 title: 'Control my PC',
                 body: 'Run the desktop Vajra Core over your Wi-Fi — full agent, computer & OS tasks. '
                     'Your phone and PC must be on the same network.',
                 onTap: () => _setMode('pc'),
               ),
-            ]),
+            ],
           ),
         ),
       );

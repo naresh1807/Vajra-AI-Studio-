@@ -12,6 +12,7 @@ void main() {
     await tester.pumpWidget(const VajraApp());
     await tester.pumpAndSettle();
     expect(find.text('Work on a GitHub repo'), findsOneWidget);
+    expect(find.text('Files on this device'), findsOneWidget);
     expect(find.text('Control my PC'), findsOneWidget);
   });
 

@@ -80,16 +80,18 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> _pair() async {
+    final url = VajraApi.normalizeUrl(urlC.text);
+    if (url.isEmpty) {
+      setState(() => pairErr = 'Enter the PC address, e.g. http://192.168.0.105:8760');
+      return;
+    }
+    urlC.text = url; // show exactly what we'll use
     setState(() {
       pairing = true;
       pairErr = '';
     });
     try {
-      if (!await api.passwordConfigured(urlC.text)) {
-        setState(() => pairErr = 'No password set on the PC yet — open Vajra there and run "Vajra: Set Password".');
-        return;
-      }
-      await api.login(urlC.text, pwC.text, 'Vajra Mobile');
+      await api.login(url, pwC.text, 'Vajra Mobile');
       if (!await api.ping()) {
         setState(() => pairErr = 'Logged in but the token was rejected — try again.');
         return;

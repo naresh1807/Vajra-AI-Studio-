@@ -16,9 +16,19 @@ class VajraApi {
   }
 
   static String normalizeUrl(String url) {
-    var u = url.trim().replaceAll(RegExp(r'/+$'), '');
-    if (u.isNotEmpty && !u.startsWith(RegExp(r'https?://'))) u = 'http://$u';
+    // strip every whitespace char (a URL has none), then trailing slashes
+    var u = url.replaceAll(RegExp(r'\s'), '').replaceAll(RegExp(r'/+$'), '');
+    if (u.isEmpty) return u;
+    if (!u.contains('://')) u = 'http://$u';
     return u;
+  }
+
+  static Uri _endpoint(String base, String path) {
+    final uri = Uri.parse('$base$path');
+    if (!uri.hasAuthority || uri.host.isEmpty) {
+      throw Exception('Enter the PC address, e.g. http://192.168.0.105:8760');
+    }
+    return uri;
   }
 
   Future<void> save(String url, String tok) async {
@@ -55,10 +65,9 @@ class VajraApi {
   Future<Map<String, dynamic>> health() =>
       http.get(Uri.parse('$baseUrl/api/health')).then((r) => jsonDecode(r.body) as Map<String, dynamic>);
 
-  /// Whether the desktop Core has a login password set yet.
+  /// Whether the desktop Core has a login password set yet. Best-effort.
   Future<bool> passwordConfigured(String url) async {
-    final base = normalizeUrl(url);
-    final r = await http.get(Uri.parse('$base/api/auth/status'));
+    final r = await http.get(_endpoint(normalizeUrl(url), '/api/auth/status'));
     if (r.statusCode >= 400) throw Exception('${r.statusCode} ${r.body}');
     return (jsonDecode(r.body) as Map<String, dynamic>)['configured'] == true;
   }
@@ -67,12 +76,14 @@ class VajraApi {
   Future<void> login(String url, String password, String name) async {
     final base = normalizeUrl(url);
     final r = await http.post(
-      Uri.parse('$base/api/auth/login'),
+      _endpoint(base, '/api/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'password': password, 'name': name}),
     );
     if (r.statusCode == 429) throw Exception('too many attempts — wait a minute');
-    if (r.statusCode == 401) throw Exception('wrong password');
+    if (r.statusCode == 401) {
+      throw Exception('Wrong password (or no password set on the PC yet).');
+    }
     if (r.statusCode >= 400) throw Exception('${r.statusCode} ${r.body}');
     final tok = (jsonDecode(r.body) as Map<String, dynamic>)['token'] as String;
     await save(base, tok);

@@ -5,6 +5,11 @@ export interface Health {
   status: string;
   models: Record<string, string>;
 }
+export interface ActivityItem {
+  i: number;
+  kind: string;
+  text: string;
+}
 export interface RunStatus {
   id: string;
   goal?: string;
@@ -12,6 +17,7 @@ export interface RunStatus {
   progress?: Record<string, number>;
   tasks: Array<{ id: string; title: string; agent: string; state: string }>;
   changed_files: string[];
+  activity?: ActivityItem[];
 }
 export interface Approval {
   id: string;
@@ -103,7 +109,7 @@ export class VajraClient {
       method: "POST",
       body: JSON.stringify({ goal, workspace_root: root, autostart: true, focus }),
     });
-  runStatus = (id: string) => this.j<RunStatus>(`/api/agent/runs/${id}`);
+  runStatus = (id: string, since = 0) => this.j<RunStatus>(`/api/agent/runs/${id}?since=${since}`);
   stopRun = (id: string) =>
     this.j<unknown>("/api/agent/stop", { method: "POST", body: JSON.stringify({ run_id: id }) });
   interrupted = () =>

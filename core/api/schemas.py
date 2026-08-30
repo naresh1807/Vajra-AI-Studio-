@@ -200,6 +200,7 @@ class AgentRunStatus(BaseModel):
     progress: dict[str, int] = {}
     tasks: list[dict] = []
     changed_files: list[str] = []
+    activity: list[dict] = []  # human-readable step log (what the agent is doing)
 
 
 class AgentStopRequest(BaseModel):

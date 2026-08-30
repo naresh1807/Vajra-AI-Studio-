@@ -118,8 +118,8 @@ export class VajraChatView implements vscode.WebviewViewProvider {
         if (!root) return this.post({ type: "bubble", bubble: { role: "system", text: "Open a folder first." } });
         await this.client.openProject(root);
         const run = await this.client.startRun(text, root, this.ctxLine());
-        this.post({ type: "bubble", bubble: { role: "system", text: `Run ${run.id} started` } });
-        this.startPoll(() => this.client.runStatus(run.id), run.id, true);
+        this.post({ type: "bubble", bubble: { role: "system", text: "Working on it…" } });
+        this.startAgentPoll(run.id);
         return;
       }
       // computer / osdev / security -> RunRef pollers
@@ -141,6 +141,29 @@ export class VajraChatView implements vscode.WebviewViewProvider {
     } catch (e) {
       this.post({ type: "bubble", bubble: { role: "system", text: `Error: ${e}` } });
     }
+  }
+
+  /** Agent runs: stream the human-readable activity feed as it happens. */
+  private startAgentPoll(id: string) {
+    if (this.poll) clearInterval(this.poll);
+    let since = 0;
+    this.poll = setInterval(async () => {
+      try {
+        const s = await this.client.runStatus(id, since);
+        const approvals: Approval[] = await this.client.approvals();
+        for (const a of s.activity ?? []) {
+          this.post({ type: "activity", item: a });
+          since = Math.max(since, a.i + 1);
+        }
+        this.post({ type: "run", id, isGraph: true, status: s, approvals });
+        if (["passed", "failed"].includes(s.status)) {
+          clearInterval(this.poll);
+          this.poll = undefined;
+        }
+      } catch {
+        /* keep polling */
+      }
+    }, 1200);
   }
 
   private startPoll(getter: () => Promise<RunStatus | RunRef>, id: string, isGraph: boolean) {
@@ -197,6 +220,17 @@ const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><styl
    align-self: flex-start; background: var(--vscode-textCodeBlock-background); }
  .b pre, .b code { font-family: var(--vscode-editor-font-family); font-size: 12.5px; }
  .b pre { background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 6px; overflow-x: auto; }
+ .act { align-self: stretch; font-size: 12px; line-height: 1.5; padding: 1px 2px; white-space: pre-wrap; word-break: break-word; }
+ .act.goal { font-weight: 600; font-size: 13px; margin-top: 2px; }
+ .act.plan { opacity: .95; padding: 4px 8px; border-left: 2px solid var(--vscode-focusBorder); background: var(--vscode-editor-inactiveSelectionBackground); border-radius: 4px; }
+ .act.task { font-weight: 600; margin-top: 6px; }
+ .act.think { opacity: .7; font-style: italic; }
+ .act.action { font-family: var(--vscode-editor-font-family); font-size: 11.5px; padding-left: 14px; }
+ .act.result { opacity: .8; padding-left: 22px; font-size: 11.5px; }
+ .act.done { color: var(--vscode-testing-iconPassed, #4c4); padding-left: 14px; }
+ .act.fail, .act.result:has(+ .fail) { color: var(--vscode-testing-iconFailed, #e55); }
+ .act.approval { color: var(--vscode-inputValidation-warningForeground, #db9); font-weight: 600; }
+ .act.summary { font-weight: 600; font-size: 13px; margin-top: 8px; padding: 6px 8px; border-radius: 6px; background: var(--vscode-editor-selectionHighlightBackground); }
  #bottom { flex-shrink: 0; border-top: 1px solid var(--vscode-panel-border); padding: 8px 10px 10px; }
  .plan { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 12px; }
  .plan > b { display: block; margin-bottom: 4px; }
@@ -260,6 +294,15 @@ const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><styl
    d.textContent = (x.role === 'tool' ? (x.ok ? '✓ ' : '✗ ') + 'inspected · ' : '') + x.text;
    log.appendChild(d); d.scrollIntoView({ block: 'end' });
  }
+ const ICON = { goal:'🎯', info:'…', plan:'🗺️', task:'▸', think:'💭', action:'⚙️',
+   result:'', done:'✓', fail:'⚠️', approval:'🔐', summary:'🏁' };
+ function activity(a) {
+   const d = document.createElement('div');
+   d.className = 'act ' + a.kind;
+   const ic = ICON[a.kind] === undefined ? '·' : ICON[a.kind];
+   d.textContent = (ic ? ic + ' ' : '') + a.text;
+   log.appendChild(d); d.scrollIntoView({ block: 'end' });
+ }
  document.getElementById('go').onclick = () => {
    const t = input.value.trim(); if (!t) return;
    input.value = ''; grow();
@@ -276,6 +319,7 @@ const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><styl
        ? 'Vajra Core · ' + (m.models && m.models.primary ? m.models.primary : 'connected')
        : 'Core offline — ' + (m.error || 'start it with “Vajra: Start Core”');
    } else if (m.type === 'bubble') bubble(m.bubble);
+   else if (m.type === 'activity') activity(m.item);
    else if (m.type === 'run') {
      runId = ['passed','failed'].includes(m.status.status) ? null : m.id;
      document.getElementById('stop').style.display = runId ? 'inline-block' : 'none';

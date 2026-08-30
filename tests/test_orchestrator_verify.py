@@ -47,3 +47,39 @@ def test_failed_dependency_blocks_dependents():
     assert g.next_ready_task() is None
     g._refresh_ready()
     assert b.state == TaskState.BLOCKED
+
+
+# -- activity feed (Claude-Code-style transparency) -------------------
+def _orch():
+    from core.events import EventBus
+    from core.orchestrator.approvals import ApprovalGate
+    return Orchestrator(EventBus("./logs"), ApprovalGate())
+
+
+def test_describe_tool_is_human_readable():
+    from core.orchestrator.orchestrator import _describe_tool
+    assert _describe_tool("write_file", {"path": "lib/main.dart"}) == "Writing lib/main.dart"
+    assert _describe_tool("run_command", {"command": ["flutter", "create", "."]}) == "Running: flutter create ."
+    assert _describe_tool("patch_file", {"path": "a.py"}) == "Editing a.py"
+    assert "bluetooth" in _describe_tool("semantic_search", {"query": "bluetooth"})
+
+
+def test_clean_reasoning_drops_tool_json():
+    from core.orchestrator.orchestrator import _clean_reasoning
+    assert _clean_reasoning("I'll create the pubspec.\n\n{...}") == "I'll create the pubspec."
+    assert _clean_reasoning('{"tool": "x"}') == ""
+    assert _clean_reasoning("") == ""
+
+
+def test_activity_feed_notes_and_paging():
+    orch = _orch()
+    orch._note("g1", "goal", "Goal: build an app")
+    orch._note("g1", "action", "Writing lib/main.dart")
+    orch._note("g1", "result", "✓ lib/main.dart")
+    feed = orch.activity("g1")
+    assert [a["kind"] for a in feed] == ["goal", "action", "result"]
+    assert feed[1]["text"] == "Writing lib/main.dart"
+    # paging by id returns only newer items
+    after = orch.activity("g1", since=feed[1]["i"])
+    assert [a["kind"] for a in after] == ["action", "result"]
+    assert orch.activity("g1", since=feed[-1]["i"] + 1) == []

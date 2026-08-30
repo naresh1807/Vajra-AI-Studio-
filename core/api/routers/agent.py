@@ -67,7 +67,7 @@ async def agent_run(req: AgentRunRequest) -> AgentRunStatus:
 
 
 @router.get("/api/agent/runs/{run_id}", dependencies=AUTH)
-async def agent_run_status(run_id: str) -> AgentRunStatus:
+async def agent_run_status(run_id: str, since: int = 0) -> AgentRunStatus:
     goal = await db.get_goal(run_id)
     if not goal:
         raise HTTPException(404, "unknown run")
@@ -77,6 +77,7 @@ async def agent_run_status(run_id: str) -> AgentRunStatus:
         progress=graph.progress() if graph else {},
         tasks=[t.model_dump() for t in graph.tasks] if graph else [],
         changed_files=await db.diff_for_goal(run_id),
+        activity=orchestrator.activity(run_id, since),
     )
 
 

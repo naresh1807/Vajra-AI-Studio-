@@ -19,8 +19,8 @@ jobs:
       - name: Lint
         run: ruff check core tests database
       - name: Test
-        env:
-          VAJRA_PAIRING_TOKEN: ci-strong-test-token-000000000000
+        # conftest.py sets a deterministic VAJRA_PAIRING_TOKEN ("test-token");
+        # the API test fixtures hard-code the same value, so don't override it here.
         run: pytest -q
 
   extension:
@@ -50,6 +50,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - working-directory: extensions/language-servers
         run: npm install
       - working-directory: .

@@ -12,6 +12,7 @@
   "contributes": {
     "commands": [
       { "command": "vajra.openPanel", "title": "Vajra: Open Panel", "icon": "$(sparkle)" },
+      { "command": "vajra.openChat", "title": "Vajra: Open Chat in Editor Tab", "icon": "$(link-external)" },
       { "command": "vajra.ask", "title": "Vajra: Ask" },
       { "command": "vajra.autonomousTask", "title": "Vajra: Autonomous Task" },
       { "command": "vajra.runTests", "title": "Vajra: Run Tests (agent)" },
@@ -56,7 +57,8 @@
         { "command": "vajra.assist.security", "group": "2@6" }
       ],
       "view/title": [
-        { "command": "vajra.semanticSearch", "when": "view == vajra.chat", "group": "navigation" }
+        { "command": "vajra.openChat", "when": "view == vajra.chat", "group": "navigation@0" },
+        { "command": "vajra.semanticSearch", "when": "view == vajra.chat", "group": "navigation@1" }
       ]
     },
     "submenus": [{ "id": "vajra.assist", "label": "Vajra" }],

@@ -28,6 +28,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.commands.registerCommand("vajra.openPanel", () => view.reveal()),
+    vscode.commands.registerCommand("vajra.openChat", () => view.openTab()),
     vscode.commands.registerCommand("vajra.ask", async () => {
       const q = await vscode.window.showInputBox({ prompt: "Ask Vajra" });
       if (q) void view.ask(q);

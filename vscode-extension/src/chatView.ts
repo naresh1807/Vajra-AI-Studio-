@@ -10,6 +10,7 @@ type Bubble = { role: "user" | "vajra" | "system" | "tool"; text: string; ok?: b
 export class VajraChatView implements vscode.WebviewViewProvider {
   static readonly viewId = "vajra.chat";
   private view?: vscode.WebviewView;
+  private panel?: vscode.WebviewPanel;
   private history: Array<{ role: string; content: string }> = [];
   private poll?: NodeJS.Timeout;
 
@@ -23,12 +24,31 @@ export class VajraChatView implements vscode.WebviewViewProvider {
     void this.refreshHealth();
   }
 
+  /** Open (or focus) the same chat as a roomy editor-area tab. */
+  openTab() {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.Beside);
+      return;
+    }
+    this.panel = vscode.window.createWebviewPanel(
+      "vajra.chatTab",
+      "Vajra",
+      vscode.ViewColumn.Beside,
+      { enableScripts: true, retainContextWhenHidden: true },
+    );
+    this.panel.webview.html = HTML;
+    this.panel.webview.onDidReceiveMessage((m) => this.onMessage(m));
+    this.panel.onDidDispose(() => (this.panel = undefined));
+    void this.refreshHealth();
+  }
+
   reveal() {
     void vscode.commands.executeCommand("vajra.chat.focus");
   }
 
   private post(m: unknown) {
     void this.view?.webview.postMessage(m);
+    void this.panel?.webview.postMessage(m);
   }
   private root() {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -62,6 +82,11 @@ export class VajraChatView implements vscode.WebviewViewProvider {
 
   private async onMessage(m: any) {
     if (m.type === "ready") return this.refreshHealth();
+    if (m.type === "openTab") return this.openTab();
+    if (m.type === "clear") {
+      this.history = [];
+      return;
+    }
     if (m.type === "resolveApproval") {
       await this.client.resolveApproval(m.id, m.verdict);
       return;
@@ -143,29 +168,60 @@ export class VajraChatView implements vscode.WebviewViewProvider {
 }
 
 const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>
- :root { color-scheme: dark light; }
- body { font: 13px var(--vscode-font-family); color: var(--vscode-foreground); margin: 0; padding: 8px; }
- #status { font-size: 11px; opacity: .75; margin-bottom: 6px; }
- .seg { display: flex; gap: 2px; margin-bottom: 8px; flex-wrap: wrap; }
- .seg button { flex: 1; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
-   border: none; padding: 3px 6px; font-size: 11px; border-radius: 3px; cursor: pointer; }
+ :root { color-scheme: dark light; --gap: 10px; }
+ * { box-sizing: border-box; }
+ html, body { height: 100%; }
+ body { font: 13.5px/1.55 var(--vscode-font-family); color: var(--vscode-foreground);
+   margin: 0; display: flex; flex-direction: column; }
+ header { display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+   border-bottom: 1px solid var(--vscode-panel-border); flex-shrink: 0; }
+ #status { font-size: 11.5px; opacity: .8; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ #status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+   background: var(--vscode-testing-iconFailed, #e55); margin-right: 6px; vertical-align: middle; }
+ #status.ok .dot { background: var(--vscode-testing-iconPassed, #4c4); }
+ .iconbtn { background: none; border: none; color: var(--vscode-foreground); opacity: .7;
+   cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; }
+ .iconbtn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+ .seg { display: flex; gap: 3px; padding: 8px 10px 0; flex-wrap: wrap; flex-shrink: 0; }
+ .seg button { flex: 1 1 auto; background: var(--vscode-button-secondaryBackground);
+   color: var(--vscode-button-secondaryForeground); border: none; padding: 4px 8px;
+   font-size: 11.5px; border-radius: 4px; cursor: pointer; }
  .seg button.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
- .b { padding: 6px 8px; margin: 4px 0; border-radius: 6px; white-space: pre-wrap; }
- .b.user { background: var(--vscode-editor-inactiveSelectionBackground); }
- .b.vajra { background: var(--vscode-editor-selectionHighlightBackground); }
- .b.system { font-size: 11px; opacity: .7; }
- .b.tool { font-size: 11px; opacity: .8; font-family: var(--vscode-editor-font-family); }
- .plan { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px; margin: 6px 0; font-size: 12px; }
- .ptask { display: flex; justify-content: space-between; padding: 2px 0; }
- .badge { font-size: 10px; opacity: .8; }
- .approval { border: 1px solid var(--vscode-inputValidation-warningBorder); border-radius: 6px; padding: 6px; margin: 6px 0; }
- .approval button { margin-right: 6px; }
- textarea { width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-   border: 1px solid var(--vscode-input-border); border-radius: 4px; padding: 6px; }
- .go { margin-top: 4px; background: var(--vscode-button-background); color: var(--vscode-button-foreground);
-   border: none; padding: 5px 14px; border-radius: 4px; cursor: pointer; }
+ #log { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+ #log:empty::after { content: "Ask a question, or describe a task for the agent."; opacity: .45; font-size: 12px; }
+ .b { padding: 8px 11px; border-radius: 10px; white-space: pre-wrap; word-break: break-word; max-width: 92%; }
+ .b.user { background: var(--vscode-editor-inactiveSelectionBackground); align-self: flex-end; }
+ .b.vajra { background: var(--vscode-editor-selectionHighlightBackground); align-self: flex-start; }
+ .b.system { font-size: 11.5px; opacity: .7; align-self: center; background: none; padding: 2px; }
+ .b.tool { font-size: 11.5px; opacity: .85; font-family: var(--vscode-editor-font-family);
+   align-self: flex-start; background: var(--vscode-textCodeBlock-background); }
+ .b pre, .b code { font-family: var(--vscode-editor-font-family); font-size: 12.5px; }
+ .b pre { background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 6px; overflow-x: auto; }
+ #bottom { flex-shrink: 0; border-top: 1px solid var(--vscode-panel-border); padding: 8px 10px 10px; }
+ .plan { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 12px; }
+ .plan > b { display: block; margin-bottom: 4px; }
+ .ptask { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+ .badge { font-size: 10.5px; opacity: .8; white-space: nowrap; }
+ .approval { border: 1px solid var(--vscode-inputValidation-warningBorder);
+   background: var(--vscode-inputValidation-warningBackground); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+ .approval button { margin-right: 6px; margin-top: 6px; }
+ .composer { display: flex; gap: 6px; align-items: flex-end; }
+ textarea { flex: 1; resize: none; min-height: 38px; max-height: 40vh; overflow-y: auto;
+   background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+   border: 1px solid var(--vscode-input-border); border-radius: 8px; padding: 9px 10px;
+   font: inherit; }
+ textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
+ .go { background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+   border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+ .go:hover { background: var(--vscode-button-hoverBackground); }
+ .go.stop { background: var(--vscode-inputValidation-errorBackground); }
+ .hint { font-size: 10.5px; opacity: .55; margin-top: 5px; }
 </style></head><body>
- <div id="status">connecting…</div>
+ <header>
+   <span id="status" class="ok"><span class="dot"></span><span id="statustext">connecting…</span></span>
+   <button class="iconbtn" id="expand" title="Open as an editor tab">⤢</button>
+   <button class="iconbtn" id="clear" title="Clear conversation">⌫</button>
+ </header>
  <div class="seg" id="seg">
    <button data-m="chat" class="on">Assisted</button>
    <button data-m="agent">Agent</button>
@@ -174,29 +230,39 @@ const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><styl
    <button data-m="security">Security</button>
  </div>
  <div id="log"></div>
- <div id="plan"></div>
- <div id="approvals"></div>
- <textarea id="in" rows="3" placeholder="Ask Vajra…"></textarea>
- <div><button class="go" id="go">Send</button><button class="go" id="stop" style="display:none">Stop</button></div>
+ <div id="bottom">
+   <div id="plan"></div>
+   <div id="approvals"></div>
+   <div class="composer">
+     <textarea id="in" rows="2" placeholder="Ask Vajra…"></textarea>
+     <button class="go" id="go">Send</button>
+     <button class="go stop" id="stop" style="display:none">Stop</button>
+   </div>
+   <div class="hint">Enter to send · Shift+Enter for a new line</div>
+ </div>
 <script>
  const vscode = acquireVsCodeApi();
  let mode = "chat", runId = null;
  const log = document.getElementById('log'), plan = document.getElementById('plan'),
    appr = document.getElementById('approvals'), input = document.getElementById('in');
+ const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, window.innerHeight * 0.4) + 'px'; };
+ input.addEventListener('input', grow);
  document.querySelectorAll('#seg button').forEach(b => b.onclick = () => {
    mode = b.dataset.m;
    document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('on', x === b));
    input.placeholder = mode === 'chat' ? 'Ask Vajra…' : 'Describe the task…';
  });
+ document.getElementById('expand').onclick = () => vscode.postMessage({ type: 'openTab' });
+ document.getElementById('clear').onclick = () => { log.innerHTML = ''; vscode.postMessage({ type: 'clear' }); };
  function bubble(x) {
    const d = document.createElement('div');
    d.className = 'b ' + x.role;
    d.textContent = (x.role === 'tool' ? (x.ok ? '✓ ' : '✗ ') + 'inspected · ' : '') + x.text;
-   log.appendChild(d); d.scrollIntoView();
+   log.appendChild(d); d.scrollIntoView({ block: 'end' });
  }
  document.getElementById('go').onclick = () => {
    const t = input.value.trim(); if (!t) return;
-   input.value = '';
+   input.value = ''; grow();
    vscode.postMessage({ type: 'send', mode, text: t });
  };
  document.getElementById('stop').onclick = () => runId && vscode.postMessage({ type: 'stop', id: runId });
@@ -204,9 +270,11 @@ const HTML = /* html */ `<!DOCTYPE html><html><head><meta charset="utf-8"/><styl
  window.addEventListener('message', e => {
    const m = e.data;
    if (m.type === 'health') {
-     document.getElementById('status').textContent = m.ok
-       ? 'Vajra Core ● ' + (m.models && m.models.primary ? m.models.primary : '')
-       : 'Vajra Core offline — ' + (m.error || '');
+     const s = document.getElementById('status');
+     s.classList.toggle('ok', !!m.ok);
+     document.getElementById('statustext').textContent = m.ok
+       ? 'Vajra Core · ' + (m.models && m.models.primary ? m.models.primary : 'connected')
+       : 'Core offline — ' + (m.error || 'start it with “Vajra: Start Core”');
    } else if (m.type === 'bubble') bubble(m.bubble);
    else if (m.type === 'run') {
      runId = ['passed','failed'].includes(m.status.status) ? null : m.id;

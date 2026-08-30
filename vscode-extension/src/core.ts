@@ -78,11 +78,18 @@ export class CoreManager {
       this.cfg("coreCwd", "").trim() ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       os.homedir();
-    const [file, ...args] = command.split(" ");
+    // A bare path (even one with spaces, e.g. "E:\Vajra AI\.venv\Scripts\vajra-api.exe")
+    // is used as-is; only a "cmd arg arg" string is split on spaces.
+    let file = command;
+    let args: string[] = [];
+    if (!fs.existsSync(command)) {
+      [file, ...args] = command.split(" ");
+    }
+    const quoted = file.includes(" ") ? `"${file}"` : file;
 
-    this.out.appendLine(`$ ${command}   (cwd: ${cwd})`);
+    this.out.appendLine(`$ ${quoted} ${args.join(" ")}   (cwd: ${cwd})`);
     try {
-      this.proc = spawn(file, args, { cwd, shell: true, env: process.env });
+      this.proc = spawn(quoted, args, { cwd, shell: true, env: process.env });
     } catch (e) {
       this.out.appendLine(`failed to spawn: ${e}`);
       this.failHint();

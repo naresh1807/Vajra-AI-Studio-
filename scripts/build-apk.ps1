@@ -12,10 +12,14 @@ $flutter = 'C:\Users\DELL\dev\flutter\bin\flutter.bat'
 
 Push-Location (Join-Path $repo 'mobile-android\flutter_app')
 try {
-  & $flutter pub get
-  & $flutter test
-  & $flutter build apk --release
   $apk = 'build\app\outputs\flutter-apk\app-release.apk'
+  if (Test-Path $apk) { Remove-Item $apk -Force }   # never publish a stale artifact
+
+  & $flutter pub get;            if ($LASTEXITCODE) { throw "flutter pub get failed ($LASTEXITCODE)" }
+  & $flutter test;               if ($LASTEXITCODE) { throw "flutter test failed ($LASTEXITCODE)" }
+  & $flutter build apk --release; if ($LASTEXITCODE) { throw "flutter build apk failed ($LASTEXITCODE) - check your internet connection (Gradle downloads plugins)" }
+  if (-not (Test-Path $apk)) { throw "build reported success but $apk is missing" }
+
   Copy-Item $apk (Join-Path $repo 'VajraMobile.apk') -Force
   Write-Host "`n-> $(Join-Path $repo 'VajraMobile.apk')  ($([math]::Round((Get-Item $apk).Length/1MB,1)) MB)" -ForegroundColor Green
 } finally {

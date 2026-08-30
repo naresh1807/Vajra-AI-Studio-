@@ -62,6 +62,16 @@ _CRITICAL_MARKERS = (
     "icacls c:\\ ", "takeown /f c:\\",
 )
 
+# Not blocked, but the model may not run these without explicit user approval
+# even inside the workspace (master-prompt P21: no unrestricted raw shell).
+# Routine dev commands (pip install, npm ci, pytest, ...) are deliberately absent.
+_HIGH_RISK_MARKERS = (
+    "| sh", "|sh", "| bash", "|bash", "| iex", "|iex", "invoke-expression",
+    "sudo ", "doas ", "runas ", "chmod 777", "chmod -r 777",
+    "rm -rf ", "rm -fr ", "git clean -fd", "> /dev/", "dd if=", "crontab ",
+    "npm install -g", "npm i -g",
+)
+
 
 class PolicyEngine:
     def __init__(self, autonomy_enabled: bool = True) -> None:
@@ -84,6 +94,14 @@ class PolicyEngine:
                 requires_approval=True,
                 risk=action.risk_level,
                 reason="High-risk action: runs only after explicit user approval.",
+            )
+
+        if any(marker in blob for marker in _HIGH_RISK_MARKERS):
+            return PolicyDecision(
+                allowed=True,
+                requires_approval=True,
+                risk=RiskLevel.HIGH,
+                reason="Command matches a high-risk shell pattern; needs explicit approval.",
             )
 
         if action.risk_level == RiskLevel.ELEVATED:

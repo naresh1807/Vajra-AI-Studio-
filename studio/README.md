@@ -37,6 +37,7 @@ scripts\bootstrap.ps1 -Tag 1.135.0     # clone + rebrand + bundle extension + np
 scripts\build.ps1                      # gulp compile -> VajraAIStudio-win32-x64\  (~25-45 min)
 scripts\build.ps1 -Setup               # ...also VajraAIStudioSetup-x64.exe (Inno installer)
 scripts\build.ps1 -SkipCompile -Setup  # installer only, from an existing compile
+scripts\smoke.ps1                      # headless check: CLI version, rebrand, bundled extension
 .\VajraAIStudio-win32-x64\"Vajra AI Studio.exe"
 ```
 

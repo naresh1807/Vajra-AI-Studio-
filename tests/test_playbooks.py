@@ -69,3 +69,33 @@ def test_run_command_keeps_exec_for_a_plain_binary(monkeypatch):
     argv, use_shell = pt._resolve(["python3", "-c", "print(1)"])
     assert use_shell is False
     assert argv == ["/usr/bin/python3", "-c", "print(1)"]
+
+
+def test_default_plan_is_playbook_aware_for_an_app_goal():
+    from core.agents.specialists import PlannerAgent
+
+    tasks = PlannerAgent._default_plan("build an android app that scans bluetooth")
+    titles = [t.title for t in tasks]
+    assert titles == ["checkpoint", "scaffold", "implement", "build", "review"]
+    blob = " ".join(t.instruction.lower() for t in tasks)
+    assert "flutter create" in blob
+    assert "pubspec.yaml" in blob and "main.dart" in blob
+
+
+def test_default_plan_stays_generic_for_a_plain_goal():
+    from core.agents.specialists import PlannerAgent
+
+    tasks = PlannerAgent._default_plan("fix the failing test in calc.py")
+    assert [t.title for t in tasks] == ["checkpoint", "implement", "test", "review"]
+
+
+def test_parse_plan_survives_fences_and_reasoning():
+    from core.agents.specialists import PlannerAgent
+
+    reply = (
+        "Let me reason about {this} first.\n"
+        '```json\n{"tasks": [{"title": "scaffold", "agent": "tester", '
+        '"instruction": "flutter create ."}]}\n```\nHope that helps."'
+    )
+    plan = PlannerAgent._parse_plan(reply)
+    assert plan and plan["tasks"][0]["title"] == "scaffold"

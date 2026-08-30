@@ -21,6 +21,20 @@ async def assist(req: AssistRequest) -> AssistResponse:
         content = read_file(req.root, req.path).content
     except WorkspaceError as exc:
         raise HTTPException(400, str(exc)) from exc
+    # P20: don't ship secrets to the model. A masked file can't be safely
+    # rewritten, so refuse edit actions on it rather than corrupt it.
+    from core.security.redaction import redact_secrets
+
+    safe_content, masked = redact_secrets(content, req.path)
+    if masked and req.action not in ("explain", "security", "document"):
+        return AssistResponse(
+            kind="prose",
+            text=(
+                f"This file looks like it contains secrets ({masked} masked). "
+                "Vajra won't send it to the model for an edit — change it by hand."
+            ),
+        )
+    content = safe_content
     result = await assist_agent.run(
         action=req.action,  # type: ignore[arg-type]
         path=req.path,

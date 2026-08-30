@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from core.policy.engine import RiskLevel
+from core.security.redaction import redact_secrets
 from core.tools.base import Tool, ToolContext, ToolResult
 
 _IGNORE = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "target", ".vajra"}
@@ -44,7 +45,8 @@ class SearchTextTool(Tool):
                     with open(full, encoding="utf-8", errors="ignore") as fh:
                         for i, line in enumerate(fh, 1):
                             if rx.search(line):
-                                hits.append(f"{rel}:{i}:{line.strip()[:200]}")
+                                masked_line, _ = redact_secrets(line.strip()[:200])
+                                hits.append(f"{rel}:{i}:{masked_line}")
                                 if len(hits) >= _MAX_HITS:
                                     return ToolResult.ok("\n".join(hits), metadata={"truncated": True})
                 except OSError:
@@ -77,7 +79,10 @@ class SemanticSearchTool(Tool):
         hits = await rag_manager.retrieve(ctx.workspace_root, query, k=max(1, min(k, 15)))
         if not hits:
             return ToolResult.ok("(no indexed matches - run /api/rag/reindex)")
-        blocks = [f"### {h.ref}  (score {h.score:.2f})\n{h.text}" for h in hits]
+        blocks = [
+            f"### {h.ref}  (score {h.score:.2f})\n{redact_secrets(h.text, h.path)[0]}"
+            for h in hits
+        ]
         return ToolResult.ok("\n\n".join(blocks), metadata={"hits": [h.ref for h in hits]})
 
 

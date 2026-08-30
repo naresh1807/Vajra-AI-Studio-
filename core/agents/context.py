@@ -17,6 +17,7 @@ from core.agents.base import AgentContext
 from core.memory import WorkspaceMemory
 from core.rag import rag_manager
 from core.runtime import git as gitsvc
+from core.security.redaction import redact_secrets
 from core.workspace import discover_workspace
 
 log = logging.getLogger("vajra.agents.context")
@@ -39,7 +40,8 @@ def _format_hits(hits) -> str:
     out: list[str] = []
     budget = _MAX_RETRIEVED_CHARS
     for h in hits:
-        block = f"## {h.path}:{h.start_line}-{h.end_line}\n{h.text.strip()}\n"
+        snippet = redact_secrets(h.text.strip(), h.path)[0]
+        block = f"## {h.path}:{h.start_line}-{h.end_line}\n{snippet}\n"
         if len(block) > budget:
             break
         out.append(block)
@@ -73,7 +75,8 @@ async def build_context(
 
     working_diff = ""
     try:
-        working_diff = (await gitsvc.diff(workspace_root))[:_MAX_DIFF_CHARS]
+        raw_diff = (await gitsvc.diff(workspace_root))[:_MAX_DIFF_CHARS]
+        working_diff = redact_secrets(raw_diff)[0]
     except Exception as exc:  # noqa: BLE001
         log.debug("git diff failed: %s", exc)
 

@@ -60,8 +60,14 @@ class ReadFileTool(Tool):
             return ToolResult.fail(f"not a file: {path}")
         data = target.read_bytes()[:_MAX_READ_BYTES]
         text = data.decode("utf-8", errors="replace")
-        ctx.file_shas[path] = _sha(text)
-        return ToolResult.ok(text, metadata={"bytes": len(data)})
+        ctx.file_shas[path] = _sha(text)  # track the real content for conflict checks
+        from core.security.redaction import redact_secrets
+
+        safe, masked = redact_secrets(text, path)
+        meta = {"bytes": len(data)}
+        if masked:
+            meta["secrets_masked"] = masked
+        return ToolResult.ok(safe, metadata=meta)
 
 
 class WriteFileTool(Tool):

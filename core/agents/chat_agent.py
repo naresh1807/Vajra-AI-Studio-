@@ -82,7 +82,9 @@ class ChatAgent:
         hits = [h for h in hits if h.score > 0.15]
         if not hits:
             return ""
-        return "\n\n".join(f"## {h.ref}\n{h.text}" for h in hits)
+        from core.security.redaction import redact_secrets
+
+        return "\n\n".join(f"## {h.ref}\n{redact_secrets(h.text, h.path)[0]}" for h in hits)
 
     async def respond(
         self,

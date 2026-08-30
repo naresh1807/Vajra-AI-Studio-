@@ -32,7 +32,7 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 | P10+ | Per-hunk diff review | 🟢 | `vscode-extension/src/hunks.ts` LCS line-diff → hunks + `applyHunks(subset)`; Assisted "Apply hunk-by-hunk…" QuickPick (canPickMany) builds a partial `WorkspaceEdit`. Full merge-editor UI still needs a GUI session. |
 | P18 | Agent context management | 🟢 | `core/agents/context.py` `build_context()`: task→semantic-search→diff→editor-focus→memory→summary, each size-capped (retrieved 6k / diff 4k / focus 4k), best-effort. `AgentContext.prompt_context()` assembles it; orchestrator + planner + every specialist use it. `/api/agent/run` takes `focus`. `tests/test_agent_context.py` |
 | P19 | Memory / RAG | 🟢 | `core/rag/`; `test_rag.py`; auto-reindex on project open |
-| P20 | Secret protection | 🟢 | `events.redact()`; `secret_scan`; `test_security.py` |
+| P20 | Secret protection | 🟢 | `events.redact()` (logs/DB) + `core/security/redaction.py` `redact_secrets()` masks .env / key files / inline creds / PEM blocks / vendor key shapes at every model-facing chokepoint: `read_file` & `search_text` & `semantic_search` tools, agent `build_context`, ChatAgent auto-retrieval, `/api/assist` (refuses edits on secret files). `test_redaction.py`; `secret_scan`; `test_security.py` |
 | P21 | Terminal security (human vs AI) | 🟢 | `/api/terminal/run` = shell; `run_command` tool = argv-only; `test_terminal.py` |
 | P22 | Computer agent | 🟢 | verified live: "create a folder on the Desktop" → approval → created |
 | P23 | High-risk approval | 🟢 | `ApprovalGate`; CRITICAL blocklist; `test_policy.py`, `test_concurrency.py` (expiry) |

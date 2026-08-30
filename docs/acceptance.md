@@ -54,10 +54,12 @@ Legend: 🟢 verified end-to-end · 🟡 implemented + unit/integration tested �
 ## The four acceptance tests
 
 1. **Critical E2E — IDE workflow** (open → manual edit → ask fix → diff → accept →
-   build/test → auto-fix → tests pass → undo): 🟡 — **every piece verified
-   individually** (assist, native diff, testing API, autonomous loop, checkpoint
-   rollback, `file_shas` conflict guard) but the full chain has not been
-   click-driven in an Extension Development Host on this (headless) machine.
+   build/test → auto-fix → tests pass → undo): 🟢 (headless) — `tests/test_acceptance_e2e.py`
+   drives the whole chain through the HTTP API: open project → read (sha) → `/api/assist`
+   fix → conflict-checked `/api/files/write` → `/api/git/checkpoint` → regression →
+   `/api/git/rollback` restores the file. The GUI click-path of the same chain still
+   needs an Extension Development Host session. (This test also caught a CRLF-file
+   409 bug in `write_file`'s conflict check.)
 2. **Autonomous "fix all errors and make it run"**: 🟢 — the autonomous loop was
    run live against Nemotron on a broken pytest project: tester→debugger→coder→
    tester→reviewer(APPROVED)→git, bounded retries, final gate green.

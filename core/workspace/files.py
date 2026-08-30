@@ -189,7 +189,9 @@ def read_file(root: str | Path, rel: str) -> FileContent:
 def write_file(root: str | Path, rel: str, content: str, base_sha: str | None = None) -> WriteResult:
     target = _resolve(root, rel)
     existed = target.is_file()
-    previous = target.read_text(encoding="utf-8", errors="replace") if existed else None
+    # Decode bytes directly (no newline translation) so this matches exactly what
+    # read_file() returned and hashed - otherwise a CRLF file always 409s (P9).
+    previous = target.read_bytes().decode("utf-8", "replace") if existed else None
     # P9: don't clobber a change made since the caller read the file
     if base_sha and existed and sha(previous or "") != base_sha:
         raise WorkspaceConflict(rel, previous or "")

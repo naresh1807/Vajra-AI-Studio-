@@ -26,6 +26,8 @@
       { "command": "vajra.stopCore", "title": "Vajra: Stop Core" },
       { "command": "vajra.restartCore", "title": "Vajra: Restart Core" },
       { "command": "vajra.showCoreLog", "title": "Vajra: Show Core Log" },
+      { "command": "vajra.healthCheck", "title": "Vajra: Health Check" },
+      { "command": "vajra.firstRun", "title": "Vajra: First-time Setup" },
       { "command": "vajra.assist.edit", "title": "Vajra: Edit with instruction… (Ctrl+K)" },
       { "command": "vajra.assist.explain", "title": "Vajra: Explain" },
       { "command": "vajra.assist.fix", "title": "Vajra: Fix" },
@@ -54,6 +56,33 @@
       ]
     },
     "submenus": [{ "id": "vajra.assist", "label": "Vajra" }],
+    "walkthroughs": [
+      {
+        "id": "vajra.getStarted",
+        "title": "Get Started with Vajra AI Studio",
+        "description": "Check your environment, connect the Core, and open a project.",
+        "steps": [
+          {
+            "id": "health",
+            "title": "Check the environment",
+            "description": "Python, Git, Node, model API… optional tools (Flutter, Docker, QEMU) are fine to skip.\n[Run Health Check](command:vajra.healthCheck)",
+            "media": { "markdown": "media/walkthrough-health.md" }
+          },
+          {
+            "id": "core",
+            "title": "The Vajra Core",
+            "description": "Studio starts the Python Core automatically. Watch it in the output channel.\n[Show Core Log](command:vajra.showCoreLog)",
+            "media": { "markdown": "media/walkthrough-core.md" }
+          },
+          {
+            "id": "panel",
+            "title": "Open the Vajra panel",
+            "description": "Assisted chat, autonomous Agent, Computer / OS-Dev / Security modes.\n[Open Panel](command:vajra.openPanel)",
+            "media": { "markdown": "media/walkthrough-panel.md" }
+          }
+        ]
+      }
+    ],
     "keybindings": [
       { "command": "vajra.assist.edit", "key": "ctrl+k", "when": "editorTextFocus" },
       { "command": "vajra.openPanel", "key": "ctrl+alt+v" }

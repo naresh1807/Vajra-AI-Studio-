@@ -15,12 +15,14 @@ from core.api.routers import (
     osdev,
     projects,
     security,
+    setup,
     terminal,
     testing,
 )
 
 ALL = [
     health.router,
+    setup.router,
     projects.router,
     files.router,
     assist.router,

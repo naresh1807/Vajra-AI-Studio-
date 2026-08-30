@@ -28,6 +28,7 @@ _EXTRA_BIN_DIRS = [
     Path.home() / ".cargo" / "bin",
     Path.home() / "go" / "bin",
     Path.home() / ".local" / "bin",
+    Path.home() / "dev" / "flutter" / "bin",
     Path("C:/Program Files/Go/bin"),
     Path("C:/Program Files/LLVM/bin"),
     Path("C:/Program Files/qemu"),

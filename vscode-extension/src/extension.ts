@@ -7,6 +7,7 @@ import { registerCompletions } from "./completions";
 import { registerTests } from "./tests";
 import { registerMisc } from "./misc";
 import { registerMarketplace } from "./marketplace";
+import { registerSetup } from "./setup";
 
 export function activate(ctx: vscode.ExtensionContext): void {
   const client = new VajraClient();
@@ -48,6 +49,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
   registerTests(ctx, client);
   registerMisc(ctx, client, core);
   registerMarketplace(ctx);
+  registerSetup(ctx, client);
 }
 
 export function deactivate(): void {}

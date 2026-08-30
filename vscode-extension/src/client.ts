@@ -72,6 +72,19 @@ export class VajraClient {
       primary: { requests: number; failures: number; avg_latency_ms: number; circuit: string };
       fallback: { requests: number; failures: number; circuit: string };
     }>("/api/models");
+  doctor = () =>
+    this.j<{ ok: boolean; checks: Array<{ name: string; status: string; detail: string; required: boolean }> }>(
+      "/api/setup/health",
+    );
+  setupState = () =>
+    this.j<{ completed: boolean; workspace?: string; device_id: string; paired_devices: number }>(
+      "/api/setup/state",
+    );
+  setupComplete = (workspace?: string) =>
+    this.j<{ ok: boolean }>("/api/setup/complete", {
+      method: "POST",
+      body: JSON.stringify({ workspace }),
+    });
 
   openProject = (rootPath: string) =>
     this.j<{ id: string }>("/api/projects", {

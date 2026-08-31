@@ -77,6 +77,31 @@ class GitCheckpointTool(Tool):
         return ToolResult.ok(f"checkpoint {tag}", metadata={"tag": tag})
 
 
+class GitCommitTool(Tool):
+    name = "git_commit"
+    description = (
+        "Stage every change and commit it with a message. Use this for a 'commit' "
+        "task (git_checkpoint is for rollback points during a run)."
+    )
+    risk = RiskLevel.MEDIUM
+    parameters = {
+        "type": "object",
+        "properties": {"message": {"type": "string"}},
+        "required": ["message"],
+    }
+
+    async def run(self, ctx: ToolContext, message: str = "", **_: Any) -> ToolResult:
+        msg = (message or "").strip() or "vajra: commit changes"
+        await _git(ctx, "add", "-A")
+        code, out, err = await _git(ctx, "commit", "-m", msg)
+        if code != 0:
+            detail = (err or out).strip()
+            if "nothing to commit" in detail:
+                return ToolResult.ok("nothing to commit - working tree already clean")
+            return ToolResult.fail(detail, exit_code=code)
+        return ToolResult.ok(out.strip() or f"committed: {msg}")
+
+
 class GitRestoreTool(Tool):
     name = "git_restore"
     description = "Reset the working tree back to a Vajra checkpoint tag (Vajra-owned changes only)."

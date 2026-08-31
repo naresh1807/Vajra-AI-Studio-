@@ -85,6 +85,7 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
     )
     from core.tools.git_tools import (
         GitCheckpointTool,
+        GitCommitTool,
         GitDiffTool,
         GitRestoreTool,
         GitStatusTool,
@@ -119,6 +120,7 @@ def build_default_registry(policy: PolicyEngine | None = None) -> ToolRegistry:
         GitStatusTool,
         GitDiffTool,
         GitCheckpointTool,
+        GitCommitTool,
         GitRestoreTool,
     ):
         registry.register(tool_cls())

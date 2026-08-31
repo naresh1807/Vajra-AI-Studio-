@@ -74,6 +74,33 @@ async def test_unknown_tool(reg, tmp_workspace):
     assert not res.success
 
 
+async def test_git_commit_tool(reg, tmp_path):
+    import subprocess
+
+    def _git(*a):
+        subprocess.run(["git", *a], cwd=tmp_path, check=True, capture_output=True)
+
+    _git("init", "-q")
+    _git("config", "user.email", "t@t")
+    _git("config", "user.name", "t")
+    (tmp_path / "x.py").write_text("y = 1\n", encoding="utf-8")
+    _git("add", "-A")
+    _git("commit", "-qm", "init")
+
+    ctx = ToolContext(workspace_root=str(tmp_path))
+    (tmp_path / "x.py").write_text("y = 2\n", encoding="utf-8")
+    res = await reg.execute(
+        ToolCall(tool_name="git_commit", arguments={"message": "fix: bump y"}), ctx
+    )
+    assert res.success
+    log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, capture_output=True, text=True).stdout
+    assert "fix: bump y" in log
+
+    # nothing staged -> not an error
+    again = await reg.execute(ToolCall(tool_name="git_commit", arguments={"message": "noop"}), ctx)
+    assert again.success and "nothing to commit" in again.stdout
+
+
 def test_quality_detect_finds_bare_pytest_files(tmp_path):
     import sys
 

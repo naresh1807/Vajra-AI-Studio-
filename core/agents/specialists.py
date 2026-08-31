@@ -248,12 +248,14 @@ class ReviewerAgent(Agent):
 class GitAgent(Agent):
     name = "git"
     system_prompt = (
-        "You are Vajra's Git Agent. Call git_checkpoint EXACTLY ONCE with a short label to "
-        "commit and tag the current state, then reply with a one-line confirmation and NO "
-        "further tool calls. Do not create more than one checkpoint and never touch unrelated "
-        "user changes. git_checkpoint succeeding once means your task is done."
+        "You are Vajra's Git Agent. Make ONE git call, then reply with a one-line "
+        "confirmation and NO further tool calls:\n"
+        "- a 'checkpoint' / 'save point' task -> git_checkpoint with a short label\n"
+        "- a 'commit' task -> git_commit with a concise, descriptive message\n"
+        "One successful call means your task is done. Never repeat it and never touch "
+        "unrelated user changes."
     )
-    allowed_tools = ("git_status", "git_diff", "git_checkpoint", "git_restore")
+    allowed_tools = ("git_status", "git_diff", "git_checkpoint", "git_commit", "git_restore")
 
 
 def build_agent_team(router: ModelRouter, registry: ToolRegistry) -> dict[str, Agent]:

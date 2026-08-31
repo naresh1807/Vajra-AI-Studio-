@@ -58,6 +58,7 @@ def _describe_tool(tool: str, args: dict) -> str:
         "git_status": "Checking git status",
         "git_diff": "Reading the diff",
         "git_checkpoint": "Creating a checkpoint",
+        "git_commit": "Committing changes",
         "git_restore": "Rolling back to a checkpoint",
     }.get(tool, f"{tool} {path or cmd or q}".strip())
 
@@ -223,11 +224,16 @@ class Orchestrator:
         final_green = await self._final_gate(goal_id, ctx)
         succeeded = final_green if final_green is not None else graph.succeeded
         files = sorted(set(changed_files))
+        stuck = [t.title for t in graph.tasks if t.state in (TaskState.FAILED, TaskState.BLOCKED)]
+        if succeeded:
+            headline = f"✓ Done — {len(files)} file(s) changed."
+            if stuck:
+                headline += f" ({len(stuck)} step(s) did not complete: {', '.join(stuck[:4])})"
+        else:
+            headline = "✗ Finished with problems — see the steps above."
         self._note(
             goal_id, "summary",
-            (f"✓ Done — {len(files)} file(s) changed." if succeeded
-             else "✗ Finished with problems — see the steps above.")
-            + (f" Files: {', '.join(files[:12])}" if files else ""),
+            headline + (f" Files: {', '.join(files[:12])}" if files else ""),
         )
         result = {
             "goal_id": goal_id,

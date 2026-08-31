@@ -16,13 +16,18 @@ studio/
     set-marketplace.mjs      switch the extension gallery
     Directory.Build.targets  native-module build fixups (Spectre off, $(LIB) path)
     _devenv-*.bat            wrap npm ci / gulp in a VS dev environment (vcvars64)
-  .builddir                  points at the fork checkout (git-ignored)
-  VajraAIStudio-win32-x64/   the built app (git-ignored)
+  branding/                  app icon: vajra.svg master + generated code.{ico,icns,png}
+  .builddir                  points at the build dir (git-ignored)
 ```
 
-**The fork checkout lives outside this repo**, at a **path without spaces**
-(default `C:\vajra-studio-build\vscode`) — VS Code's own build scripts break on
-spaces in the checkout path. `-BuildDir` overrides it.
+**Everything the build produces lives outside this repo**, under the build dir
+(default `C:\vajra-studio-build\`): the Code-OSS checkout (`vscode\`), the app
+(`VajraAIStudio-win32-x64\`) and the installer (`VajraAIStudioSetup-x64.exe`).
+Two reasons it must not be inside the repo: VS Code's build scripts break on
+**spaces** in the checkout path, and a 1.3 GB Electron tree under a
+**OneDrive-synced** path gets its files dehydrated mid-session — the app then
+dies at launch with `Invalid file descriptor to ICU data received`. `-BuildDir`
+overrides the location.
 
 ## Build
 
@@ -34,28 +39,36 @@ requirement for the native helper modules via `Directory.Build.targets`.)
 ```powershell
 cd studio
 scripts\bootstrap.ps1 -Tag 1.135.0     # clone + rebrand + bundle extension + npm ci  (~20 min)
-scripts\build.ps1                      # gulp compile -> VajraAIStudio-win32-x64\  (~25-45 min)
-scripts\build.ps1 -Setup               # ...also VajraAIStudioSetup-x64.exe (Inno installer)
+scripts\build.ps1                      # gulp compile -> <buildDir>\VajraAIStudio-win32-x64\  (~25-45 min)
+scripts\build.ps1 -Setup               # ...also <buildDir>\VajraAIStudioSetup-x64.exe (Inno installer)
 scripts\build.ps1 -SkipCompile -Setup  # installer only, from an existing compile
 scripts\smoke.ps1                      # headless check: CLI version, rebrand, bundled extension
 ```
 
-Then **double-click `VajraAIStudio-win32-x64\Vajra AI Studio.exe` in Explorer**,
-or run `VajraAIStudio-win32-x64\Vajra AI Studio.cmd` from a terminal.
+The build prints the exact paths when it finishes. The portable app is at
+`<buildDir>\VajraAIStudio-win32-x64\` — **double-click `Vajra AI Studio.exe` in
+Explorer**, run `Vajra AI Studio.cmd` from a terminal, or run the installer for a
+Start-menu entry. Installing is the most reliable: it lands in
+`%LOCALAPPDATA%\Programs\` with a shortcut that always launches clean.
 
 The **Core** (the Python `vajra-api`) is started automatically by the bundled
 extension when Studio opens (`vajra.autoStartCore`, on by default). Install it
 once — `pip install -e ".[dev]"` in the Vajra repo — or point `vajra.coreCommand`
 at your own launcher.
 
-**Gotcha — `ELECTRON_RUN_AS_NODE`.** VS Code's integrated terminal (and anything
-an extension host spawns) exports `ELECTRON_RUN_AS_NODE=1`. Launch the `.exe`
-directly from such a shell and every Electron child dies at startup with
-`Invalid file descriptor to ICU data received` — no window, just that line. Fixes:
-launch from Explorer / the Start menu (clean env), or use the generated
-`Vajra AI Studio.cmd` (it scrubs the var), or `Remove-Item env:ELECTRON_RUN_AS_NODE`
-first. An installed copy's Start-menu shortcut is always clean. `bin\vajra-studio.cmd`
-is the CLI and *does* want the var set — leave it alone.
+**`Invalid file descriptor to ICU data received`** at launch (no window, just
+that line) has two causes:
+
+- **OneDrive.** If the app folder is under a synced path, OneDrive dehydrates its
+  files and the Electron children can't read `icudtl.dat` in time. Keep the build
+  out of OneDrive (the default `C:\vajra-studio-build\` is fine) — or install it.
+- **`ELECTRON_RUN_AS_NODE=1`.** VS Code's integrated terminal (and anything an
+  extension host spawns) exports it. Launch from Explorer / the Start menu, use
+  the generated `Vajra AI Studio.cmd` (it scrubs the var), or
+  `Remove-Item env:ELECTRON_RUN_AS_NODE` first. `bin\vajra-studio.cmd` is the CLI
+  and *does* want the var set — leave it alone.
+
+An installed copy sidesteps both.
 
 Dev run (no packaging): `cd studio\vscode ; .\scripts\code.bat`
 

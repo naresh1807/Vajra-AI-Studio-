@@ -1,7 +1,10 @@
 <#
-  Compiles Vajra AI Studio from the bootstrapped fork.
-    scripts\build.ps1            -> studio\VajraAIStudio-win32-x64\  (portable folder)
-    scripts\build.ps1 -Setup     -> also studio\VajraAIStudioSetup-x64.exe  (Inno installer)
+  Compiles Vajra AI Studio from the bootstrapped fork. Output goes to the build
+  dir (<buildDir>\, default C:\vajra-studio-build), NOT into this repo - a 1.3 GB
+  Electron tree under a OneDrive-synced path gets its files dehydrated mid-run and
+  the app then dies with "Invalid file descriptor to ICU data received".
+    scripts\build.ps1            -> <buildDir>\VajraAIStudio-win32-x64\  (portable folder)
+    scripts\build.ps1 -Setup     -> also <buildDir>\VajraAIStudioSetup-x64.exe  (Inno installer)
   ~25-45 min first time.
 #>
 param([switch]$Setup, [switch]$SkipCompile)
@@ -27,7 +30,12 @@ $buildDir = if (Test-Path $bdFile) { (Get-Content $bdFile).Trim() } else { "C:\v
 $vscode = Join-Path $buildDir "vscode"
 if (-not (Test-Path (Join-Path $vscode "node_modules"))) { throw "Run scripts\bootstrap.ps1 first." }
 $out = Join-Path $buildDir "VSCode-win32-x64"
-$target = Join-Path $studio "VajraAIStudio-win32-x64"
+$target = Join-Path $buildDir "VajraAIStudio-win32-x64"   # NOT under $studio - keep the Electron tree out of OneDrive
+$legacy = Join-Path $studio "VajraAIStudio-win32-x64"     # pre-migration builds landed here
+if (Test-Path $legacy) {
+  if (-not (Test-Path $target)) { try { Move-Item $legacy $target -EA Stop } catch { Remove-Tree $legacy } }
+  else { Remove-Tree $legacy }
+}
 
 if (-not $SkipCompile) {
   # re-apply our patches (in case of an upstream checkout) then gulp-build
@@ -58,8 +66,8 @@ if ($Setup) {
   & (Join-Path $PSScriptRoot "_devenv-setup.bat") $vscode
   if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
   $inst = Get-ChildItem (Join-Path $vscode ".build\win32-x64\user-setup\*.exe"),(Join-Path $vscode ".build\win32\user-setup\*.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
-  Copy-Item $inst.FullName (Join-Path $studio "VajraAIStudioSetup-x64.exe") -Force
-  Write-Host "`n-> $(Join-Path $studio 'VajraAIStudioSetup-x64.exe')  ($([math]::Round($inst.Length/1MB,0)) MB)" -ForegroundColor Green
+  Copy-Item $inst.FullName (Join-Path $buildDir "VajraAIStudioSetup-x64.exe") -Force
+  Write-Host "`n-> $(Join-Path $buildDir 'VajraAIStudioSetup-x64.exe')  ($([math]::Round($inst.Length/1MB,0)) MB)" -ForegroundColor Green
 }
 
 if (-not (Test-Path $target)) {
@@ -82,5 +90,7 @@ start "" "%~dp0Vajra AI Studio.exe" %*
 $exe = Get-ChildItem $target -Filter "*.exe" | Where-Object { $_.Name -notlike "*Crash*" } | Select-Object -First 1
 Write-Host "`n-> `"$($exe.FullName)`"   (double-click in Explorer)" -ForegroundColor Green
 Write-Host "   from a terminal:  `"$target\Vajra AI Studio.cmd`" <folder>   (scrubs the env)"
-Write-Host "   NOTE: running the .exe directly from VS Code's terminal fails with an ICU error -"
-Write-Host "         ELECTRON_RUN_AS_NODE is set there; use the .cmd or Explorer."
+Write-Host "   NOTE: launching the .exe from VS Code's integrated terminal fails with"
+Write-Host "         'Invalid file descriptor to ICU data received' - ELECTRON_RUN_AS_NODE"
+Write-Host "         is set there. Use the .cmd, Explorer, or the installed shortcut."
+if ($Setup) { Write-Host "   installer: `"$(Join-Path $buildDir 'VajraAIStudioSetup-x64.exe')`"" }

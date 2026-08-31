@@ -54,7 +54,32 @@ async def test_run_command_echo(reg, tmp_workspace):
     assert res.success and res.stdout.strip() == "4"
 
 
+async def test_run_command_rejects_shell_string(reg, tmp_workspace):
+    ctx = ToolContext(workspace_root=str(tmp_workspace))
+    res = await reg.execute(
+        ToolCall(tool_name="run_command", arguments={"command": "cat > calc.py <<'EOF'\nx=1\nEOF"}), ctx
+    )
+    assert not res.success and "write_file" in res.stderr
+    assert not (tmp_workspace / "calc.py").exists()  # nothing was run
+    # an explicit argv list is never treated as a shell string
+    ok = await reg.execute(
+        ToolCall(tool_name="run_command", arguments={"command": ["python", "-c", "print('a>b|c')"]}), ctx
+    )
+    assert ok.success and ok.stdout.strip() == "a>b|c"
+
+
 async def test_unknown_tool(reg, tmp_workspace):
     ctx = ToolContext(workspace_root=str(tmp_workspace))
     res = await reg.execute(ToolCall(tool_name="nope", arguments={}), ctx)
     assert not res.success
+
+
+def test_quality_detect_finds_bare_pytest_files(tmp_path):
+    import sys
+
+    from core.tools.quality_tools import _detect
+
+    assert "test" not in _detect(tmp_path)  # empty dir - nothing to run
+    (tmp_path / "test_calc.py").write_text("def test_ok(): assert 1\n", encoding="utf-8")
+    cmds = _detect(tmp_path)
+    assert cmds.get("test") == [sys.executable, "-m", "pytest", "-q"]  # Core's interpreter, has pytest

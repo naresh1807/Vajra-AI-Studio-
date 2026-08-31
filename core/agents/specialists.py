@@ -89,18 +89,28 @@ class PlannerAgent(Agent):
             plan = None
 
         graph = TaskGraph(goal_id=goal_id, goal=ctx.goal, max_retries=max_retries)
-        if plan and plan.get("tasks"):
+        # a weaker model may return tasks as bare strings, or a mix - coerce.
+        raw_tasks = [
+            {"title": t} if isinstance(t, str) else t
+            for t in (plan.get("tasks") if isinstance(plan, dict) else None) or []
+            if isinstance(t, (str, dict))
+        ]
+        # if the model never assigned an agent, it didn't really give us a task
+        # DAG - the deterministic (playbook-aware) default plan is better.
+        if not any(isinstance(t, dict) and t.get("agent") for t in raw_tasks):
+            raw_tasks = []
+        if raw_tasks:
             title_to_id: dict[str, str] = {}
-            for raw in plan["tasks"]:
+            for raw in raw_tasks:
                 task = Task(
-                    title=raw.get("title", "task"),
+                    title=str(raw.get("title") or raw.get("name") or "task"),
                     agent=raw.get("agent", "coder"),
                     instruction=raw.get("instruction", raw.get("title", "")),
                     success_criteria=raw.get("success_criteria", ""),
                 )
                 title_to_id[task.title] = task.id
                 graph.tasks.append(task)
-            for raw, task in zip(plan["tasks"], graph.tasks, strict=False):
+            for raw, task in zip(raw_tasks, graph.tasks, strict=False):
                 task.depends_on = [
                     title_to_id[d] for d in raw.get("depends_on", []) if d in title_to_id
                 ]
@@ -238,9 +248,10 @@ class ReviewerAgent(Agent):
 class GitAgent(Agent):
     name = "git"
     system_prompt = (
-        "You are Vajra's Git Agent. Create checkpoints and commits for Vajra-owned changes. "
-        "Use git_checkpoint with a short label to commit and tag the current state. Never touch "
-        "unrelated user changes."
+        "You are Vajra's Git Agent. Call git_checkpoint EXACTLY ONCE with a short label to "
+        "commit and tag the current state, then reply with a one-line confirmation and NO "
+        "further tool calls. Do not create more than one checkpoint and never touch unrelated "
+        "user changes. git_checkpoint succeeding once means your task is done."
     )
     allowed_tools = ("git_status", "git_diff", "git_checkpoint", "git_restore")
 

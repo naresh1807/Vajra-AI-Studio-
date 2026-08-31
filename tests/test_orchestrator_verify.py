@@ -6,8 +6,8 @@ from core.orchestrator.task_graph import Task, TaskGraph, TaskState
 V = Orchestrator._verify
 
 
-def _task(agent: str) -> Task:
-    return Task(title="t", agent=agent, instruction="i")
+def _task(agent: str, title: str = "t", instruction: str = "i") -> Task:
+    return Task(title=title, agent=agent, instruction=instruction)
 
 
 def test_infra_error_always_fails():
@@ -25,6 +25,34 @@ def test_tester_needs_a_check_to_have_run():
 def test_coder_debugger_git_pass_without_infra_error():
     for agent in ("coder", "debugger", "git"):
         assert V(_task(agent), None, None, True)[0] is True
+
+
+def test_coder_that_wrote_nothing_fails():
+    ok, reason = V(_task("coder", title="implement calc.py"), None, None, False)
+    assert not ok and "without writing" in reason
+    ok, reason = V(_task("debugger", title="fix the bug"), None, None, False)
+    assert not ok and "without writing" in reason
+    # git makes no file changes of its own - a checkpoint is enough
+    assert V(_task("git"), None, None, False)[0] is True
+
+
+def test_coder_analysis_task_may_write_nothing():
+    # planners often assign an analyse/report step to the coder agent
+    for title in ("Analyze shopping.py for the bug", "investigate the failing test",
+                  "Review the module and report issues", "Identify the root cause"):
+        assert V(_task("coder", title=title), None, None, False)[0] is True
+    # but if it made changes, still fine
+    assert V(_task("coder", title="analyze then fix"), None, None, True)[0] is True
+
+
+def test_coder_noop_ok_when_the_goal_already_progressed():
+    fix = _task("coder", title="fix the bug")
+    # first edit task with nothing done yet -> must produce a change
+    assert V(fix, None, None, False)[0] is False
+    # a redundant edit task after an earlier task already edited files -> fine
+    assert V(fix, None, None, False, goal_changed=True)[0] is True
+    # ...or when the suite is already green
+    assert V(fix, True, None, False)[0] is True
 
 
 def test_reviewer_is_non_blocking():

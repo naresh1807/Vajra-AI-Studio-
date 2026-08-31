@@ -7,12 +7,82 @@ Tool schemas are kept provider-independent.
 
 from __future__ import annotations
 
+import json
+import re
 from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel
 
 from core.config import ModelEndpoint
+
+#: Nemotron/NIM models sometimes emit a tool call as a JSON object in the message
+#: body instead of a proper ``tool_calls`` entry. Recover those so the agent loop
+#: still makes progress. Matches ```json fences and bare top-level objects.
+_TOOLCALL_FENCE = re.compile(r"```(?:json|tool_call)?\s*([\s\S]*?)```", re.IGNORECASE)
+
+
+def _balanced_objects(text: str) -> list[str]:
+    """Every top-level balanced ``{...}`` substring, in order (string-aware)."""
+    spans: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] == "{":
+            depth = 0
+            in_str = esc = False
+            for j in range(i, len(text)):
+                c = text[j]
+                if in_str:
+                    esc = (c == "\\") and not esc
+                    if c == '"' and not esc:
+                        in_str = False
+                elif c == '"':
+                    in_str = True
+                elif c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        spans.append(text[i:j + 1])
+                        i = j
+                        break
+        i += 1
+    return spans
+
+
+def _tool_calls_from_text(text: str) -> tuple[list[ToolCall], str]:
+    """Pull ``{"name": ..., "arguments": {...}}`` tool calls out of a model reply
+    that put them in the body. Returns (calls, text-with-those-blobs-removed)."""
+    if not text or '"name"' not in text:
+        return [], text
+    candidates = (_TOOLCALL_FENCE.findall(text) or []) + _balanced_objects(text)
+    calls: list[ToolCall] = []
+    removed: list[str] = []
+    seen: set[str] = set()
+    for cand in candidates:
+        try:
+            obj = json.loads(cand.strip())
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(obj, dict) or not isinstance(obj.get("name"), str):
+            continue
+        if "arguments" not in obj and "parameters" not in obj:
+            continue  # {"name": ...} with no args block is probably not a tool call
+        args = obj.get("arguments", obj.get("parameters")) or {}
+        if not isinstance(args, dict):
+            continue
+        key = obj["name"] + json.dumps(args, sort_keys=True, default=str)
+        if key in seen:
+            removed.append(cand)
+            continue
+        seen.add(key)
+        calls.append(ToolCall(id=f"text-{len(calls)}", name=obj["name"], arguments=args))
+        removed.append(cand)
+    cleaned = text
+    for blob in removed:
+        cleaned = cleaned.replace(blob, "")
+    cleaned = re.sub(r"```(?:json|tool_call)?\s*```", "", cleaned, flags=re.IGNORECASE).strip()
+    return calls, cleaned
 
 
 class ChatMessage(BaseModel):
@@ -119,16 +189,20 @@ class OpenAICompatClient:
         tool_calls: list[ToolCall] = []
         for call in raw_calls:
             fn = call.get("function", {})
-            import json
-
             try:
                 args = json.loads(fn.get("arguments") or "{}")
             except json.JSONDecodeError:
                 args = {"_raw": fn.get("arguments")}
             tool_calls.append(ToolCall(id=call.get("id", ""), name=fn.get("name", ""), arguments=args))
 
+        text = msg.get("content") or ""
+        if tools and not tool_calls:
+            # some NIM models put the call in the body - recover it
+            recovered, text = _tool_calls_from_text(text)
+            tool_calls = recovered
+
         return LLMResponse(
-            text=msg.get("content") or "",
+            text=text,
             tool_calls=tool_calls,
             model=data.get("model", self.endpoint.model),
             provider=self.endpoint.provider,

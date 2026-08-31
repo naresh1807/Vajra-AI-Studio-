@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -11,11 +12,35 @@ from core.tools.base import Tool, ToolContext, ToolResult
 from core.tools.process_tools import RunCommandTool
 
 
+def _python_for(root: Path) -> str:
+    """The interpreter to run pytest/ruff with: the workspace venv if it has one,
+    else the interpreter running the Core (which has pytest/ruff from [dev])."""
+    for rel in (".venv/Scripts/python.exe", ".venv/bin/python", "venv/Scripts/python.exe", "venv/bin/python"):
+        cand = root / rel
+        if cand.exists():
+            return str(cand)
+    return sys.executable
+
+
+def _has_pytest_layout(root: Path) -> bool:
+    return (
+        (root / "pyproject.toml").exists()
+        or (root / "pytest.ini").exists()
+        or (root / "tox.ini").exists()
+        or (root / "setup.cfg").exists()
+        or (root / "tests").is_dir()
+        or any(root.glob("test_*.py"))
+        or any(root.glob("*_test.py"))
+        or any(root.glob("*/test_*.py"))
+    )
+
+
 def _detect(root: Path) -> dict[str, list[str]]:
     cmds: dict[str, list[str]] = {}
-    if (root / "pyproject.toml").exists() or (root / "pytest.ini").exists():
-        cmds["test"] = ["python", "-m", "pytest", "-q"]
-        cmds["lint"] = ["python", "-m", "ruff", "check", "."]
+    if _has_pytest_layout(root):
+        py = _python_for(root)
+        cmds["test"] = [py, "-m", "pytest", "-q"]
+        cmds["lint"] = [py, "-m", "ruff", "check", "."]
     if (root / "package.json").exists():
         try:
             pkg = json.loads((root / "package.json").read_text(encoding="utf-8"))

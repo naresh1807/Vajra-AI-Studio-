@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shlex
 import subprocess
 from typing import Any
@@ -14,6 +15,10 @@ from core.policy.engine import RiskLevel
 from core.tools.base import Tool, ToolContext, ToolResult
 
 _MAX_OUTPUT = 60_000
+
+#: shell constructs that a bare argv exec cannot honour (redirection, pipes,
+#: chaining, heredocs, command/var substitution).
+_SHELL_META = re.compile(r"(?<!\\)(>>|<<|[|&;<>`]|\|\||&&|\$\()")
 
 
 def _as_argv(command: Any) -> list[str]:
@@ -66,6 +71,14 @@ class RunCommandTool(Tool):
     ) -> ToolResult:
         if not command:
             return ToolResult.fail("no command given")
+        if isinstance(command, str) and _SHELL_META.search(command):
+            return ToolResult.fail(
+                "run_command executes an argv array directly - it has no shell, so "
+                "redirection (>), pipes (|), chaining (&&/;) and heredocs (<<) do not work "
+                "and the command above was NOT run. To create or edit a file use write_file / "
+                "patch_file. To genuinely need a shell pipeline, pass command as an explicit "
+                "list, e.g. [\"bash\", \"-lc\", \"<your shell line>\"]."
+            )
         argv, use_shell = _resolve(_as_argv(command))
         try:
             common = dict(

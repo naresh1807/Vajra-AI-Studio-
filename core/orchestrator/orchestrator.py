@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field
 
 from core.agents.base import AgentContext
@@ -184,7 +185,7 @@ class Orchestrator:
                 title=task.title, agent=task.agent, attempt=task.attempts,
             )
             try:
-                outcome = await self._run_task(goal_id, task, ctx)
+                outcome = await self._run_task(goal_id, task, ctx, goal_changed=bool(changed_files))
             except Exception as exc:  # noqa: BLE001
                 outcome = TaskOutcome(False, f"{type(exc).__name__}: {exc}", infra_error=str(exc))
                 log.exception("task %s crashed", task.id)
@@ -248,7 +249,9 @@ class Orchestrator:
         return result
 
     # -- internals ----------------------------------------------------------
-    async def _run_task(self, goal_id: str, task: Task, ctx: AgentContext) -> TaskOutcome:
+    async def _run_task(
+        self, goal_id: str, task: Task, ctx: AgentContext, *, goal_changed: bool = False
+    ) -> TaskOutcome:
         agent = self.agents.get(task.agent)
         if agent is None:
             return TaskOutcome(False, f"no agent named {task.agent}", infra_error="no agent")
@@ -308,7 +311,9 @@ class Orchestrator:
 
         tests_green = test_results[-1] if test_results else None
         summary = (last_text or "").strip()[:500] or "done"
-        passed, infra = self._verify(task, tests_green, infra_error, bool(changed))
+        passed, infra = self._verify(
+            task, tests_green, infra_error, bool(changed), goal_changed=goal_changed
+        )
         return TaskOutcome(
             passed=passed,
             summary=summary if not infra else f"{summary} [{infra}]",
@@ -317,9 +322,18 @@ class Orchestrator:
             infra_error=infra,
         )
 
-    @staticmethod
+    #: coder/debugger task words that mean "look, don't edit" - such a task
+    #: legitimately finishes with no file changes.
+    _READ_ONLY_TASK = re.compile(
+        r"\b(analy[sz]e|investigat|identif|diagnos|review|inspect|explain|report|"
+        r"understand|research|assess|audit|summar|explore|read)\w*",
+        re.IGNORECASE,
+    )
+
+    @classmethod
     def _verify(
-        task: Task, tests_green: bool | None, infra_error: str | None, made_changes: bool
+        cls, task: Task, tests_green: bool | None, infra_error: str | None,
+        made_changes: bool, *, goal_changed: bool = False,
     ) -> tuple[bool, str | None]:
         """Structural verification.
 
@@ -337,7 +351,17 @@ class Orchestrator:
             if tests_green is None:
                 return False, "tester ran no test/build command"
             return True, None
-        # coder / debugger / git: succeeded if the agent finished without infra errors.
+        if (
+            task.agent in ("coder", "debugger")
+            and not made_changes
+            and not goal_changed          # some earlier task already edited files
+            and tests_green is not True   # ...or the suite is already green
+            and not cls._READ_ONLY_TASK.search(f"{task.title} {task.instruction}")
+        ):
+            # An edit task that touched no files, with nothing else done toward
+            # the goal, did not do its job - retry it (then re-plan).
+            return False, f"{task.agent} finished without writing or patching any file"
+        # git / analysis / already-satisfied tasks: OK if no infra error.
         return True, None
 
     async def _request_approval(self, goal_id: str, task_id: str, call: ToolCall, reason: str) -> bool:

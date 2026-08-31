@@ -99,3 +99,41 @@ def test_parse_plan_survives_fences_and_reasoning():
     )
     plan = PlannerAgent._parse_plan(reply)
     assert plan and plan["tasks"][0]["title"] == "scaffold"
+
+
+class _PlanRouter:
+    def __init__(self, text):
+        self.text = text
+
+    def describe(self):
+        return {"primary": "stub", "fallback": "stub"}
+
+    async def complete(self, messages, tools=None, temperature=0.2, max_tokens=2048):
+        from core.llm import LLMResponse
+
+        return LLMResponse(text=self.text, model="m", provider="p")
+
+
+async def _graph_for(text, goal="fix the failing test in calc.py"):
+    from core.agents.base import AgentContext
+    from core.agents.specialists import PlannerAgent
+    from core.tools import build_default_registry
+
+    planner = PlannerAgent(_PlanRouter(text), build_default_registry())
+    ctx = AgentContext(goal=goal, workspace_root=".")
+    return await planner.create_task_graph("g1", ctx, max_retries=2)
+
+
+async def test_planner_survives_tasks_as_bare_strings():
+    # a weak model returns titles only, no agent -> fall back to the default plan
+    g = await _graph_for('{"tasks": ["write calc.py", "run the tests"]}')
+    assert [t.agent for t in g.tasks] == ["git", "coder", "tester", "reviewer"]
+
+
+async def test_planner_uses_a_real_model_dag_when_given_one():
+    g = await _graph_for(
+        '{"tasks": [{"title": "impl", "agent": "coder", "depends_on": []},'
+        ' {"title": "check", "agent": "tester", "depends_on": ["impl"]}]}'
+    )
+    assert [t.title for t in g.tasks] == ["impl", "check"]
+    assert g.tasks[1].depends_on == [g.tasks[0].id]

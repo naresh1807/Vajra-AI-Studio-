@@ -148,7 +148,7 @@ class RagIndex:
     def search(self, query: str, k: int = 6) -> list[Hit]:
         if not query.strip() or not self.files:
             return []
-        qv = self.embedder.embed([query])[0]
+        qv = self.embedder.embed([query], input_type="query")[0]
         scored: list[Hit] = []
         for rel, f in self.files.items():
             for c in f["chunks"]:

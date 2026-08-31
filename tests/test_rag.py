@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+import pytest
+
 from core.rag.chunker import chunk_text
 from core.rag.embed import Embedder, cosine
 from core.rag.index import RagIndex
+
+
+@pytest.fixture(autouse=True)
+def _offline_embeddings(monkeypatch):
+    """These tests exercise the deterministic offline path - pin it on even when
+    the machine's .env points VAJRA_EMBED_BASE_URL at a real endpoint."""
+    from core.config import get_settings
+
+    monkeypatch.setenv("VAJRA_EMBED_BASE_URL", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def test_chunk_text_windows_and_overlap():

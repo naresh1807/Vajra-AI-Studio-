@@ -68,15 +68,19 @@ class Embedder:
         self.api_key = os.environ.get(s.vajra_embed_api_key_env or "", "")
         self.kind = "remote" if self.base_url else "lexical"
         self.dim = 0 if self.base_url else _LEXICAL_DIM
+        #: None = unknown, True = endpoint takes input_type, False = it rejects it
+        self._wants_input_type: bool | None = None
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], input_type: str = "passage") -> list[list[float]]:
+        """``input_type`` is "passage" for indexed chunks, "query" for a search
+        string - asymmetric embedding models (NIM's included) want the hint."""
         if not texts:
             return []
         if not self.base_url:
             return [_lexical_vector(t) for t in texts]
-        return self._embed_remote(texts)
+        return self._embed_remote(texts, input_type)
 
-    def _embed_remote(self, texts: list[str]) -> list[list[float]]:
+    def _embed_remote(self, texts: list[str], input_type: str = "passage") -> list[list[float]]:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -84,13 +88,19 @@ class Embedder:
         with httpx.Client(timeout=60) as client:
             for i in range(0, len(texts), 64):
                 batch = [t[:8000] for t in texts[i : i + 64]]
+                body: dict = {"model": self.model, "input": batch}
+                if self._wants_input_type is not False:
+                    body["input_type"] = input_type
                 try:
-                    r = client.post(
-                        f"{self.base_url}/embeddings",
-                        headers=headers,
-                        json={"model": self.model, "input": batch},
-                    )
+                    r = client.post(f"{self.base_url}/embeddings", headers=headers, json=body)
+                    if r.status_code in (400, 422) and "input_type" in body:
+                        # OpenAI / Ollama reject the extra field - NIM requires it.
+                        self._wants_input_type = False
+                        body.pop("input_type")
+                        r = client.post(f"{self.base_url}/embeddings", headers=headers, json=body)
                     r.raise_for_status()
+                    if self._wants_input_type is None:
+                        self._wants_input_type = True
                     data = sorted(r.json()["data"], key=lambda d: d["index"])
                     vectors.extend(d["embedding"] for d in data)
                 except (httpx.HTTPError, KeyError, ValueError):

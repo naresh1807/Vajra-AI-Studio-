@@ -29,6 +29,10 @@ log = logging.getLogger("vajra.llm")
 _BREAKER_THRESHOLD = 4      # consecutive failures before the tier is skipped
 _BREAKER_COOLDOWN = 60.0    # seconds to skip it for
 
+#: tier priority. "secondary" is only present when config.secondary is set, so
+#: the loop skips over it for the common primary -> fallback setup.
+_TIER_SEQUENCE = ("primary", "secondary", "fallback")
+
 
 @dataclass
 class _TierStats:
@@ -75,13 +79,23 @@ class _TierStats:
 @dataclass
 class ModelRouter:
     config: ModelConfig = field(default_factory=get_model_config)
+    #: "chat" (default) uses config as-is. "agent" swaps config.agent_model onto
+    #: the primary tier - autonomous agents need capability over latency.
+    role: str = "chat"
 
     def __post_init__(self) -> None:
+        if self.role == "agent" and self.config.agent_model:
+            # copy so we don't mutate the lru_cached shared config
+            self.config = self.config.model_copy(deep=True)
+            self.config.primary.model = self.config.agent_model
         self._clients = {
             "primary": OpenAICompatClient(self.config.primary),
             "fallback": OpenAICompatClient(self.config.fallback),
         }
         self._stats = {"primary": _TierStats(), "fallback": _TierStats()}
+        if self.config.secondary is not None:
+            self._clients["secondary"] = OpenAICompatClient(self.config.secondary)
+            self._stats["secondary"] = _TierStats()
 
     @property
     def transient_attempts(self) -> int:
@@ -99,12 +113,14 @@ class ModelRouter:
         max_tokens: int = 2048,
     ) -> LLMResponse:
         last_exc: Exception | None = None
-        for label in ("primary", "fallback"):
+        for label in _TIER_SEQUENCE:
+            client = self._clients.get(label)
+            if client is None:
+                continue  # tier not configured (the usual case for "secondary")
             stats = self._stats[label]
             if stats.is_open():
                 log.info("model %s: circuit open, skipping", label)
                 continue
-            client = self._clients[label]
             for attempt in range(1, self.transient_attempts + 1):
                 started = time.monotonic()
                 try:
@@ -136,14 +152,18 @@ class ModelRouter:
         )
 
     def describe(self) -> dict[str, str]:
-        return {
+        d = {
             "primary": f"{self.config.primary.provider}:{self.config.primary.model}",
             "fallback": f"{self.config.fallback.provider}:{self.config.fallback.model}",
         }
+        if self.config.secondary is not None:
+            sec = self.config.secondary
+            d["secondary"] = f"{sec.provider}:{sec.model}"
+        return d
 
     def stats(self) -> dict:
-        return {
-            "models": self.describe(),
-            "primary": self._stats["primary"].as_dict(),
-            "fallback": self._stats["fallback"].as_dict(),
-        }
+        out: dict = {"models": self.describe()}
+        for label in _TIER_SEQUENCE:
+            if label in self._stats:
+                out[label] = self._stats[label].as_dict()
+        return out

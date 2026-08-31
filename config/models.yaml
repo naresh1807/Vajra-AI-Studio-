@@ -9,6 +9,12 @@ primary:
   timeout_seconds: 120
   max_context_tokens: 128000
 
+# Model the "agent" router (autonomous planner + coder/tester/debugger, and the
+# computer/osdev/security agents) swaps onto the primary tier. Agent runs drive a
+# multi-step tool loop, so they need a more capable model than chat. Empty -> the
+# agent router just uses the primary model above.
+agent_model: ${VAJRA_AGENT_MODEL}
+
 fallback:
   provider: local
   model: ${VAJRA_LOCAL_MODEL}
@@ -16,6 +22,18 @@ fallback:
   api_key_env: null
   timeout_seconds: 300
   max_context_tokens: 32000
+
+# Optional middle tier, tried between primary and fallback. Any OpenAI-compatible
+# /chat/completions endpoint. Entirely env-driven: leave VAJRA_SECONDARY_BASE_URL
+# empty (the default) and this tier is dropped. .env.example wires it to GitHub
+# Models as a worked example.
+secondary:
+  provider: ${VAJRA_SECONDARY_PROVIDER}
+  model: ${VAJRA_SECONDARY_MODEL}
+  base_url: ${VAJRA_SECONDARY_BASE_URL}
+  api_key_env: VAJRA_SECONDARY_API_KEY
+  timeout_seconds: 120
+  max_context_tokens: 128000
 
 retry:
   transient_attempts: 3

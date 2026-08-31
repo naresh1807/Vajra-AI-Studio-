@@ -63,10 +63,25 @@ class Settings(BaseSettings):
 
     nvidia_api_key: str | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    vajra_nemotron_model: str = "nvidia/nemotron-3-super-120b-a12b"
+    #: model for chat / inline-assist / completion - fast, high-availability.
+    vajra_nemotron_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
+    #: model for autonomous agent work (planner + coder/tester/debugger/... and
+    #: the computer/osdev/security agents). These drive a multi-step tool loop,
+    #: so capability matters more than latency - default to the strongest model.
+    #: Empty -> agents fall back to vajra_nemotron_model.
+    vajra_agent_model: str = "nvidia/nemotron-3-super-120b-a12b"
 
     vajra_local_model: str = "qwen2.5-coder"
     vajra_local_base_url: str = "http://localhost:11434/v1"
+
+    # Optional middle tier, tried between the primary (NVIDIA) and the local
+    # fallback. Any OpenAI-compatible /chat/completions endpoint. Empty base_url
+    # -> the tier is dropped and the router stays primary -> fallback. The API
+    # key is read from the env var named by ``api_key_env`` in models.yaml
+    # (VAJRA_SECONDARY_API_KEY). See .env.example for a GitHub Models example.
+    vajra_secondary_provider: str = "openai_compat"
+    vajra_secondary_model: str = ""
+    vajra_secondary_base_url: str = ""
 
     # RAG embeddings. Empty base_url -> offline lexical fallback (no network).
     # Point at any OpenAI-compatible /embeddings endpoint (NIM, Ollama, ...).
@@ -103,6 +118,11 @@ class ModelEndpoint(BaseModel):
 class ModelConfig(BaseModel):
     primary: ModelEndpoint
     fallback: ModelEndpoint
+    #: optional tier tried between primary and fallback; None when not configured.
+    secondary: ModelEndpoint | None = None
+    #: model name the "agent" router swaps onto the primary tier (see
+    #: ModelRouter(role="agent")). Falls back to primary.model when empty.
+    agent_model: str | None = None
     retry: dict[str, Any] = {}
 
 
@@ -133,4 +153,14 @@ def get_model_config(path: str | None = None) -> ModelConfig:
     cfg.primary.base_url = cfg.primary.base_url or s.nvidia_base_url
     cfg.fallback.model = cfg.fallback.model or s.vajra_local_model
     cfg.fallback.base_url = cfg.fallback.base_url or s.vajra_local_base_url
+    cfg.agent_model = cfg.agent_model or s.vajra_agent_model or None
+    # Optional secondary tier: fill blanks from Settings, then drop it entirely
+    # if it still has no endpoint so the default router is a clean primary ->
+    # fallback with no dead tier to skip past.
+    if cfg.secondary is not None:
+        cfg.secondary.provider = cfg.secondary.provider or s.vajra_secondary_provider
+        cfg.secondary.model = cfg.secondary.model or s.vajra_secondary_model
+        cfg.secondary.base_url = cfg.secondary.base_url or s.vajra_secondary_base_url
+        if not cfg.secondary.base_url:
+            cfg.secondary = None
     return cfg

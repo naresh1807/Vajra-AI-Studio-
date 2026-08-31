@@ -19,7 +19,7 @@ Edit `.env`:
 
 ```
 NVIDIA_API_KEY=nvapi-...
-VAJRA_NEMOTRON_MODEL=nvidia/nemotron-3-super-120b-a12b
+VAJRA_NEMOTRON_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
 VAJRA_PAIRING_TOKEN=<pick a long random string>
 ```
 

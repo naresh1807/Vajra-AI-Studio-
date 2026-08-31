@@ -34,14 +34,17 @@ settings = get_settings()
 
 events = EventBus(settings.log_dir)
 approvals = ApprovalGate()
+#: chat / inline-assist / completion - the fast model.
 model_router = ModelRouter()
-orchestrator = Orchestrator(events, approvals, settings, model_router)
+#: autonomous multi-step agents - the stronger agent model (see VAJRA_AGENT_MODEL).
+agent_router = ModelRouter(role="agent")
+orchestrator = Orchestrator(events, approvals, settings, agent_router)
 chat_agent = ChatAgent(model_router, orchestrator.registry)
 assist_agent = AssistAgent(model_router)
 completion_agent = CompletionAgent(model_router)
-computer_agent = ComputerAgent(model_router, approvals, events)
-osdev_agent = OsDevAgent(model_router, approvals, events)
-security_agent = SecurityAgent(model_router, approvals, events)
+computer_agent = ComputerAgent(agent_router, approvals, events)
+osdev_agent = OsDevAgent(agent_router, approvals, events)
+security_agent = SecurityAgent(agent_router, approvals, events)
 db = get_database()
 
 #: in-flight background tasks / run snapshots, shared across agent routers

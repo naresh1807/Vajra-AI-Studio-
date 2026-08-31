@@ -7,8 +7,9 @@ import asyncio
 
 import pytest
 
+from core.config import ModelEndpoint
 from core.llm import LLMPermanentError, LLMRateLimited, LLMResponse
-from core.llm.model_router import ModelRouter
+from core.llm.model_router import ModelRouter, _TierStats
 from core.llm.nemotron_client import LLMClientError
 
 
@@ -40,12 +41,22 @@ class _Client:
 @pytest.fixture
 def router():
     r = ModelRouter()
+    # get_model_config() is lru_cached - copy so per-test tweaks don't leak.
+    r.config = r.config.model_copy(deep=True)
     r.config.retry["transient_attempts"] = 3
     r.config.retry["backoff_seconds"] = 0  # no real sleeping in tests
     return r
 
 
 def _wire(router, primary_script, fallback_script):
+    router._clients["primary"] = _Client("primary", primary_script)
+    router._clients["fallback"] = _Client("fallback", fallback_script)
+
+
+def _wire3(router, primary_script, secondary_script, fallback_script):
+    router.config.secondary = ModelEndpoint(provider="secondary", model="m", base_url="http://s")
+    router._clients["secondary"] = _Client("secondary", secondary_script)
+    router._stats["secondary"] = _TierStats()
     router._clients["primary"] = _Client("primary", primary_script)
     router._clients["fallback"] = _Client("fallback", fallback_script)
 
@@ -94,6 +105,59 @@ async def test_both_down_raises(router):
     _wire(router, ["boom"] * 3, ["boom"] * 3)
     with pytest.raises(LLMClientError):
         await router.complete([])
+
+
+async def test_no_secondary_tier_by_default(router):
+    _wire(router, ["boom"] * 3, ["ok"])
+    r = await router.complete([])
+    assert r.provider == "fallback"
+    assert "secondary" not in router.stats()
+    assert "secondary" not in router.describe()
+
+
+async def test_secondary_tried_between_primary_and_fallback(router):
+    _wire3(router, ["boom", "boom", "boom"], ["ok"], ["ok"])
+    r = await router.complete([])
+    assert r.provider == "secondary"
+    assert router._clients["fallback"].calls == 0  # never reached the local fallback
+    assert router.stats()["secondary"]["requests"] == 1
+    assert "secondary" in router.describe()
+
+
+async def test_secondary_exhausted_falls_through_to_fallback(router):
+    _wire3(router, ["boom"] * 3, ["boom"] * 3, ["ok"])
+    r = await router.complete([])
+    assert r.provider == "fallback"
+    assert router.stats()["secondary"]["failures"] == 3
+
+
+async def test_all_three_tiers_down_raises(router):
+    _wire3(router, ["boom"] * 3, ["boom"] * 3, ["boom"] * 3)
+    with pytest.raises(LLMClientError):
+        await router.complete([])
+
+
+def test_agent_role_swaps_primary_model():
+    from core.config import get_model_config
+
+    cfg = get_model_config().model_copy(deep=True)
+    cfg.agent_model = "vendor/big-agent-model"
+    chat = ModelRouter(config=cfg.model_copy(deep=True))
+    agent = ModelRouter(config=cfg.model_copy(deep=True), role="agent")
+    assert agent.describe()["primary"].endswith("big-agent-model")
+    assert chat.describe()["primary"] != agent.describe()["primary"]
+    # fallback + secondary tiers are untouched by the role swap
+    assert agent.describe()["fallback"] == chat.describe()["fallback"]
+
+
+def test_agent_role_is_noop_without_agent_model():
+    from core.config import get_model_config
+
+    cfg = get_model_config().model_copy(deep=True)
+    cfg.agent_model = None
+    chat = ModelRouter(config=cfg.model_copy(deep=True))
+    agent = ModelRouter(config=cfg.model_copy(deep=True), role="agent")
+    assert agent.describe()["primary"] == chat.describe()["primary"]
 
 
 async def test_cancellation_propagates(router):

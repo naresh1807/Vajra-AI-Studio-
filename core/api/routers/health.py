@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from core.api.deps import AUTH, model_router
+from core.api.deps import AUTH, agent_router, model_router
 from core.api.schemas import SimpleOk
 
 router = APIRouter()
@@ -25,7 +25,9 @@ async def root() -> dict:
 @router.get("/api/health")
 @router.get("/health")  # kept for the desktop sidecar's readiness probe
 async def health() -> dict:
-    return {"status": "ok", "service": "vajra-core", "version": "0.3.0", "models": model_router.describe()}
+    models = model_router.describe()
+    models["agent"] = agent_router.describe()["primary"]
+    return {"status": "ok", "service": "vajra-core", "version": "0.3.0", "models": models}
 
 
 @router.get("/api/ping", dependencies=AUTH)

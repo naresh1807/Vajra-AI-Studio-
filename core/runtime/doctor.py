@@ -68,7 +68,11 @@ async def _model_api() -> Check:
         cfg = r.config.primary
         if not cfg.base_url:
             return Check("Model API", "error", "no base_url configured for the primary model")
-        return Check("Model API", "ok", f"primary {d['primary']} / fallback {d['fallback']}")
+        tiers = " / ".join(f"{k} {d[k]}" for k in ("primary", "secondary", "fallback") if k in d)
+        agent_primary = ModelRouter(role="agent").describe()["primary"]
+        if agent_primary != d["primary"]:
+            tiers += f"  (agent: {agent_primary})"
+        return Check("Model API", "ok", tiers)
     except Exception as exc:  # noqa: BLE001
         return Check("Model API", "error", str(exc))
 

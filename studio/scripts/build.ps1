@@ -7,6 +7,20 @@
 param([switch]$Setup, [switch]$SkipCompile)
 
 $ErrorActionPreference = "Stop"
+
+# Recursively delete a tree that may contain paths longer than MAX_PATH (the
+# bundled copilot extension nests node_modules deep enough that Remove-Item
+# -Recurse throws). robocopy mirrors an empty dir over it first, then the husk
+# deletes cleanly. Best-effort: a locked file (OneDrive / indexer) is tolerated.
+function Remove-Tree($path) {
+  if (-not (Test-Path $path)) { return }
+  $empty = Join-Path $env:TEMP "vajra-empty-$PID"
+  New-Item -ItemType Directory -Force -Path $empty | Out-Null
+  robocopy $empty $path /MIR /NFL /NDL /NJH /NJS /R:1 /W:1 | Out-Null
+  Remove-Item $path  -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item $empty -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 $studio = Split-Path $PSScriptRoot -Parent
 $bdFile = Join-Path $studio ".builddir"
 $buildDir = if (Test-Path $bdFile) { (Get-Content $bdFile).Trim() } else { "C:\vajra-studio-build" }
@@ -27,6 +41,15 @@ if (-not $SkipCompile) {
 
   & (Join-Path $PSScriptRoot "_devenv-gulp.bat") $vscode
   if ($LASTEXITCODE -ne 0) { throw "gulp build failed" }
+
+  # the fresh compile lands at $out - it supersedes any previous $target so a
+  # rebuild doesn't silently keep serving the old app folder. Rename the stale
+  # one aside first (instant, same volume) so the move below always succeeds.
+  if ((Test-Path $out) -and (Test-Path $target)) {
+    $stale = "$target.stale-$(Get-Date -Format yyyyMMddHHmmss)"
+    Move-Item $target $stale
+    Remove-Tree $stale
+  }
 }
 
 if ($Setup) {

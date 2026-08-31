@@ -66,7 +66,21 @@ if (-not (Test-Path $target)) {
   if (-not (Test-Path $out)) { throw "expected build output at $out" }
   Move-Item $out $target
 }
+
+# Double-clickable launcher that scrubs the environment first. Launching the exe
+# from a shell that exports ELECTRON_RUN_AS_NODE=1 (VS Code's integrated terminal,
+# anything spawned by an extension host) makes the Electron children die with
+# "Invalid file descriptor to ICU data received". Explorer / Start-menu launches
+# are already clean; this covers the portable folder run from a bad shell.
+@'
+@echo off
+set "ELECTRON_RUN_AS_NODE="
+set "VSCODE_PID=" & set "VSCODE_CWD=" & set "VSCODE_IPC_HOOK=" & set "VSCODE_NLS_CONFIG="
+start "" "%~dp0Vajra AI Studio.exe" %*
+'@ | Set-Content (Join-Path $target "Vajra AI Studio.cmd") -Encoding ascii
+
 $exe = Get-ChildItem $target -Filter "*.exe" | Where-Object { $_.Name -notlike "*Crash*" } | Select-Object -First 1
-Write-Host "`n-> `"$($exe.FullName)`"" -ForegroundColor Green
-Write-Host "   or:  `"$target\bin\vajra-studio.cmd`" <folder>"
-Write-Host "   NOTE: unset ELECTRON_RUN_AS_NODE in your shell first, or the exe runs as plain node."
+Write-Host "`n-> `"$($exe.FullName)`"   (double-click in Explorer)" -ForegroundColor Green
+Write-Host "   from a terminal:  `"$target\Vajra AI Studio.cmd`" <folder>   (scrubs the env)"
+Write-Host "   NOTE: running the .exe directly from VS Code's terminal fails with an ICU error -"
+Write-Host "         ELECTRON_RUN_AS_NODE is set there; use the .cmd or Explorer."

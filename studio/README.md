@@ -38,17 +38,24 @@ scripts\build.ps1                      # gulp compile -> VajraAIStudio-win32-x64
 scripts\build.ps1 -Setup               # ...also VajraAIStudioSetup-x64.exe (Inno installer)
 scripts\build.ps1 -SkipCompile -Setup  # installer only, from an existing compile
 scripts\smoke.ps1                      # headless check: CLI version, rebrand, bundled extension
-.\VajraAIStudio-win32-x64\"Vajra AI Studio.exe"
 ```
+
+Then **double-click `VajraAIStudio-win32-x64\Vajra AI Studio.exe` in Explorer**,
+or run `VajraAIStudio-win32-x64\Vajra AI Studio.cmd` from a terminal.
 
 The **Core** (the Python `vajra-api`) is started automatically by the bundled
 extension when Studio opens (`vajra.autoStartCore`, on by default). Install it
 once — `pip install -e ".[dev]"` in the Vajra repo — or point `vajra.coreCommand`
 at your own launcher.
 
-**Gotcha:** if `ELECTRON_RUN_AS_NODE` is set in your shell, the `.exe` runs as
-plain Node and rejects every flag (`bad option: --user-data-dir`). `Remove-Item
-env:ELECTRON_RUN_AS_NODE` first. The `bin\vajra-studio.cmd` CLI is unaffected.
+**Gotcha — `ELECTRON_RUN_AS_NODE`.** VS Code's integrated terminal (and anything
+an extension host spawns) exports `ELECTRON_RUN_AS_NODE=1`. Launch the `.exe`
+directly from such a shell and every Electron child dies at startup with
+`Invalid file descriptor to ICU data received` — no window, just that line. Fixes:
+launch from Explorer / the Start menu (clean env), or use the generated
+`Vajra AI Studio.cmd` (it scrubs the var), or `Remove-Item env:ELECTRON_RUN_AS_NODE`
+first. An installed copy's Start-menu shortcut is always clean. `bin\vajra-studio.cmd`
+is the CLI and *does* want the var set — leave it alone.
 
 Dev run (no packaging): `cd studio\vscode ; .\scripts\code.bat`
 

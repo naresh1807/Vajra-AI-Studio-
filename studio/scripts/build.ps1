@@ -20,6 +20,7 @@ if (-not $SkipCompile) {
   node (Join-Path $PSScriptRoot "apply-overrides.mjs") $vscode
   $mk = if (Test-Path (Join-Path $vscode ".vajra-marketplace")) { (Get-Content (Join-Path $vscode ".vajra-marketplace")).Trim() } else { "openvsx" }
   node (Join-Path $PSScriptRoot "set-marketplace.mjs") $mk $vscode
+  node (Join-Path $PSScriptRoot "patch-fork.mjs") $vscode
   Copy-Item (Join-Path $PSScriptRoot "Directory.Build.targets") $vscode -Force
   robocopy (Join-Path (Split-Path $studio -Parent) "vscode-extension") (Join-Path $vscode "extensions\vajra") /MIR /XD node_modules src /XF *.vsix tsconfig.json .vscodeignore /NFL /NDL /NJH /NJS | Out-Null
 

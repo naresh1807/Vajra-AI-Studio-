@@ -80,8 +80,15 @@ so upstream stays untouched and rebasing is just:
 ```powershell
 git -C studio\vscode fetch --tags
 git -C studio\vscode checkout <newer-tag>
-studio\scripts\apply-overrides.mjs studio\vscode   # re-apply the rebrand
+node studio\scripts\apply-overrides.mjs studio\vscode   # re-apply the rebrand
+node studio\scripts\patch-fork.mjs     studio\vscode   # re-apply source patches
 ```
+
+`patch-fork.mjs` carries the few upstream source edits `product.overrides.json`
+can't express (currently: making the proprietary `@github/copilot` CLI SDK shim
+optional — a public `npm ci` only gets a partial package and upstream's
+packaging step throws without it). It's idempotent and `build.ps1` re-runs it on
+every compile.
 
 The extension provides: the **Vajra** activity-bar panel (Assisted / Agent /
 Computer / OS Dev / Security), right-click + `Ctrl+K` assisted edits with native

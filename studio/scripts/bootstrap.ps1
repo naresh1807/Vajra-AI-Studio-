@@ -41,6 +41,7 @@ if (-not (Test-Path $vscode)) {
 Write-Host "Rebranding product.json ..." -ForegroundColor Cyan
 node (Join-Path $PSScriptRoot "apply-overrides.mjs") $vscode
 node (Join-Path $PSScriptRoot "set-marketplace.mjs") $Marketplace $vscode
+node (Join-Path $PSScriptRoot "patch-fork.mjs") $vscode
 
 Write-Host "Bundling the Vajra extension as a built-in ..." -ForegroundColor Cyan
 Push-Location (Join-Path $repo "vscode-extension")

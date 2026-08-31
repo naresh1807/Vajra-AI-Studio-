@@ -82,6 +82,7 @@ git -C studio\vscode fetch --tags
 git -C studio\vscode checkout <newer-tag>
 node studio\scripts\apply-overrides.mjs studio\vscode   # re-apply the rebrand
 node studio\scripts\patch-fork.mjs     studio\vscode   # re-apply source patches
+node studio\scripts\apply-icons.mjs    studio\vscode   # re-apply the icon set
 ```
 
 `patch-fork.mjs` carries the few upstream source edits `product.overrides.json`
@@ -89,6 +90,20 @@ can't express (currently: making the proprietary `@github/copilot` CLI SDK shim
 optional — a public `npm ci` only gets a partial package and upstream's
 packaging step throws without it). It's idempotent and `build.ps1` re-runs it on
 every compile.
+
+## Branding / icon
+
+The app icon (a bolt inside a diamond — *vajra* is both "thunderbolt" and
+"diamond") is authored as `branding/vajra.svg`. `apply-icons.mjs` copies the
+generated `branding/code.ico` / `.icns` / `.png` set into the fork's
+`resources/{win32,darwin,linux,server}` and rebrands the Windows tile manifest —
+it has no dependencies and `bootstrap.ps1` / `build.ps1` run it every compile.
+After editing the SVG, regenerate the binaries:
+
+```powershell
+npm i --no-save sharp png-to-ico
+node studio\scripts\regen-icons.mjs      # rewrites branding/*.ico|*.icns|*.png
+```
 
 The extension provides: the **Vajra** activity-bar panel (Assisted / Agent /
 Computer / OS Dev / Security), right-click + `Ctrl+K` assisted edits with native

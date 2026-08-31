@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c212e"/>
+      <stop offset="1" stop-color="#0c0e14"/>
+    </linearGradient>
+    <linearGradient id="dia" x1="0.12" y1="0.05" x2="0.9" y2="0.98">
+      <stop offset="0" stop-color="#8dbef9"/>
+      <stop offset="0.55" stop-color="#4f8ded"/>
+      <stop offset="1" stop-color="#356fd4"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#b7dbff"/>
+      <stop offset="1" stop-color="#5f9bf2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4f8ded" stop-opacity="0.40"/>
+      <stop offset="1" stop-color="#4f8ded" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="300" fill="url(#glow)"/>
+
+  <!-- diamond frame -->
+  <path d="M512 148 L864 512 L512 876 L160 512 Z" fill="none"
+        stroke="url(#dia)" stroke-width="46" stroke-linejoin="round"/>
+  <!-- top-left facet highlight -->
+  <path d="M512 148 L160 512" fill="none" stroke="#a9cffb" stroke-width="46"
+        stroke-linecap="round" opacity="0.55"/>
+
+  <!-- bolt: 180deg-rotationally symmetric about centre so it sits balanced -->
+  <path d="M560 296 L398 552 L506 552 L464 728 L626 472 L518 472 Z"
+        fill="url(#bolt)" stroke="#d7e9ff" stroke-width="9" stroke-linejoin="round"/>
+</svg>

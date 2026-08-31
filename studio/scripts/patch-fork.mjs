@@ -3,7 +3,7 @@
 // compile so an upstream checkout doesn't silently drop them.
 //
 //   node scripts/patch-fork.mjs <vscodeDir>
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,13 +32,34 @@ const patch = (relPath, edits) => {
   if (txt !== before) writeFileSync(p, txt);
 };
 
-// --- 1. Copilot CLI SDK shim is optional for this fork -----------------------
-// VS Code's packaging hard-requires the proprietary @github/copilot CLI SDK
-// (Microsoft restores it from an authenticated pre-built VSIX). A public
-// `npm ci` only yields a partial package, so `prepareBuiltInCopilotRipgrepShim`
-// throws and fails the whole build. Vajra ships its own AI via the bundled
-// `vajra` extension and does not bundle Copilot - degrade the shim to a no-op
-// when its inputs are absent.
+// --- 1. Drop the proprietary built-in `copilot` extension -------------------
+// Vajra ships its own AI via the bundled `vajra` extension and does not bundle
+// GitHub Copilot. Removing extensions/copilot before `npm ci`:
+//   * skips fetching its ~1150-package dependency tree (faster, ~250 MB smaller)
+//   * kills the @opentelemetry/... nested-node_modules paths that blow past
+//     Windows MAX_PATH - which broke the Inno installer (MoveFile code 3) and
+//     Remove-Item on the build tree.
+// Runs before npm ci in bootstrap.ps1, so the dir has no node_modules yet and
+// deletes cheaply. packageCopilotExtensionStream() already no-ops on a missing
+// dir; the shim patch below covers the packaging task.
+{
+  const copilotDir = join(vscodeDir, "extensions", "copilot");
+  if (existsSync(copilotDir)) {
+    try {
+      rmSync(copilotDir, { recursive: true, force: true, maxRetries: 3 });
+      console.log("patch-fork: removed extensions/copilot");
+      applied++;
+    } catch (err) {
+      console.warn(`patch-fork: could not remove extensions/copilot (${err.code || err.message}) - ` +
+        "the shim patch still lets the build finish, but the Inno installer may hit MAX_PATH");
+    }
+  }
+}
+
+// --- 2. Copilot CLI SDK shim is optional for this fork ----------------------
+// Belt-and-suspenders for the removal above: VS Code's packaging still runs
+// prepareBuiltInCopilotRipgrepShim, which hard-throws when the proprietary
+// @github/copilot CLI SDK isn't fully present. Degrade it to a no-op.
 patch("build/lib/copilot.ts", [
   [
     "\t\tthrow new Error(`[prepareBuiltInCopilotRipgrepShim] Copilot SDK directory not found at ${copilotSdkBase}`);",

@@ -105,11 +105,13 @@ node studio\scripts\patch-fork.mjs     studio\vscode   # re-apply source patches
 node studio\scripts\apply-icons.mjs    studio\vscode   # re-apply the icon set
 ```
 
-`patch-fork.mjs` carries the few upstream source edits `product.overrides.json`
-can't express (currently: making the proprietary `@github/copilot` CLI SDK shim
-optional — a public `npm ci` only gets a partial package and upstream's
-packaging step throws without it). It's idempotent and `build.ps1` re-runs it on
-every compile.
+`patch-fork.mjs` carries the upstream changes `product.overrides.json` can't
+express. Currently: **removes the built-in `extensions/copilot`** (Vajra doesn't
+bundle GitHub Copilot; its `@opentelemetry/…` nested `node_modules` also blow
+past Windows MAX_PATH, which breaks the Inno installer and recursive deletes),
+and makes the leftover Copilot-SDK packaging shim a no-op. Run it **before**
+`npm ci` on a fresh checkout so the copilot dir deletes before it grows a deep
+`node_modules`; `bootstrap.ps1` and `build.ps1` already sequence it that way.
 
 ## Branding / icon
 
